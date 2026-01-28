@@ -1,4 +1,4 @@
-# moleman (Go/YAML prototype)
+# moleman
 
 moleman is a minimal, shell-first workflow runner for automating advanced local AI coding
 workflows. It executes a YAML plan made of reusable steps, groups, and loops, and writes
@@ -6,14 +6,14 @@ artifacts per run for review and auditing.
 
 > Status: early prototype. Expect breaking config and CLI changes.
 
-## Install (local)
+## Install (from repo)
 
 ```
 go build -o moleman
 ./moleman --help
 ```
 
-## Quick Start (AI coding)
+## Quick Start (modify this repo)
 
 ```
 ./moleman init
@@ -32,7 +32,7 @@ make build
 make check
 ```
 
-## Config (`moleman.yaml`)
+## Example Config (`moleman.yaml`)
 
 ```yaml
 version: 1
@@ -155,7 +155,7 @@ See `examples/` for minimal and looped AI workflows.
 
 ## Etymology
 
-This project is named after Hans Moleman, the eternally unlucky Springfield everyman who somehow keeps coming back no matter how many times the universe
+This project is inspired by the resiliance of Hans Moleman, the eternally unlucky Springfield everyman who somehow keeps coming back no matter how many times the universe
 drops a piano on him. `moleman` might get knocked around by failed runs, exploding diffs, and wild reviews, yet
-is ready to resurface with a fresh go at the workflow. If Moleman can survive 44 on‑screen deaths, `moleman` can
-survive a few yolo blunders and keep going.
+is ready to resurface with a fresh try at any workflow. If Moleman can survive 44 on‑screen deaths, `moleman` can
+survive a few yolo blunders and keep shipping.

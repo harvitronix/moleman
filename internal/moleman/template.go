@@ -3,6 +3,7 @@ package moleman
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 )
 
@@ -11,6 +12,9 @@ func RenderTemplate(input string, data map[string]any) (string, error) {
 		return "", nil
 	}
 	tpl, err := template.New("moleman").
+		Funcs(template.FuncMap{
+			"shellEscape": shellEscape,
+		}).
 		Option("missingkey=zero").
 		Parse(input)
 	if err != nil {
@@ -21,4 +25,11 @@ func RenderTemplate(input string, data map[string]any) (string, error) {
 		return "", fmt.Errorf("execute template: %w", err)
 	}
 	return buf.String(), nil
+}
+
+func shellEscape(input string) string {
+	if input == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(input, "'", "'\"'\"'") + "'"
 }

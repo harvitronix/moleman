@@ -4,7 +4,7 @@ version: 1
 steps:
   codex_write:
     type: run
-    run: "codex exec --full-auto '{{ .input.prompt }}'"
+    run: "codex exec --full-auto {{ shellEscape .input.prompt }}"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 

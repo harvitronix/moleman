@@ -3,7 +3,7 @@ version: 1
 steps:
   code:
     type: run
-    run: "ai-code --non-interactive --prompt '{{ .input.prompt }}' --context '{{ .git.diff }}'"
+    run: "ai-code --non-interactive --prompt {{ shellEscape .input.prompt }} --context {{ shellEscape .git.diff }}"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 

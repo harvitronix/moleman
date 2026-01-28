@@ -41,7 +41,7 @@ steps:
   code:
     type: run
     # Replace with your local AI CLI command
-    run: "ai-code --non-interactive --prompt '{{ .input.prompt }}' --context '{{ .git.diff }}'"
+    run: "ai-code --non-interactive --prompt {{ shellEscape .input.prompt }} --context {{ shellEscape .git.diff }}"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
@@ -128,6 +128,10 @@ git.branch == "main"
 - `steps.<id>.stdout`, `steps.<id>.stderr`, `steps.<id>.exitCode`
 - `stepsHistory.<id>[i].stdout`, `.stderr`, `.exitCode`
 - `vars.*` (populated by `parse`)
+
+Template helper functions:
+
+- `shellEscape` (wraps a value for safe use as a POSIX shell argument)
 
 ## Artifacts
 

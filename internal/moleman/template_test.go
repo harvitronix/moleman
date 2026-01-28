@@ -22,3 +22,19 @@ func TestRenderTemplate(t *testing.T) {
 		t.Fatalf("unexpected output: %q", out)
 	}
 }
+
+func TestRenderTemplateShellEscape(t *testing.T) {
+	data := map[string]any{
+		"input": map[string]any{
+			"prompt": "we're good",
+		},
+	}
+
+	out, err := RenderTemplate("{{ shellEscape .input.prompt }}", data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out != "'we'\"'\"'re good'" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}

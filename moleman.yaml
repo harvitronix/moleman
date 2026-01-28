@@ -1,27 +1,51 @@
-# Example config; customize for your workflow before use.
+# Example config for dogfooding moleman with Codex.
 version: 1
 
 steps:
-  lint:
+  codex_write:
     type: run
-    run: "pnpm lint"
-    timeout: 10m
+    run: "codex exec --full-auto '{{ .input.prompt }}'"
+    timeout: 45m
     capture: [stdout, stderr, exitCode]
 
-  tests:
+  codex_review:
     type: run
-    run: "pnpm test"
+    run: "codex exec 'Review the changes and list must-fix issues based on the current git diff.' --output-last-message .moleman/tmp/review.txt"
+    timeout: 30m
+    capture: [stdout, stderr, exitCode]
+
+  codex_apply_review:
+    type: run
+    run: "codex exec --full-auto 'Apply the review feedback below. Only change what is required.'"
+    stdinFile: ".moleman/tmp/review.txt"
+    timeout: 45m
+    capture: [stdout, stderr, exitCode]
+
+  test:
+    type: run
+    run: "make check"
     timeout: 20m
 
+  build:
+    type: run
+    run: "make build"
+    timeout: 10m
+
 groups:
-  core:
+  dogfood:
     - type: ref
-      id: lint
+      id: codex_write
     - type: ref
-      id: tests
+      id: codex_review
+    - type: ref
+      id: codex_apply_review
+    - type: ref
+      id: test
+    - type: ref
+      id: build
 
 pipelines:
   default:
     plan:
       - type: ref
-        id: core
+        id: dogfood

@@ -62,24 +62,31 @@ func Run(cfg *Config, cfgPath string, opts RunOptions) (*RunResult, error) {
 		RunDir:       runDir,
 		Workdir:      workdir,
 		Verbose:      opts.Verbose,
+		StepOrder:    []StepExecution{},
 	}
 
+	fmt.Printf("run started: pipeline %s\n", opts.Pipeline)
+	fmt.Printf("run artifacts: %s\n", runDir)
+
 	if opts.DryRun {
-		if err := writeSummary(runDir, opts.Pipeline, "dry-run", nil); err != nil {
+		if err := writeSummary(runDir, opts.Pipeline, "dry-run", nil, ctx); err != nil {
 			return &RunResult{RunDir: runDir}, err
 		}
+		printSummary(os.Stdout, opts.Pipeline, "dry-run", nil, ctx)
 		return &RunResult{RunDir: runDir}, nil
 	}
 
 	err = executeNodes(ctx, plan, false)
 	if err != nil {
-		writeSummary(runDir, opts.Pipeline, "failed", err)
+		writeSummary(runDir, opts.Pipeline, "failed", err, ctx)
+		printSummary(os.Stderr, opts.Pipeline, "failed", err, ctx)
 		return &RunResult{RunDir: runDir}, err
 	}
 
-	if err := writeSummary(runDir, opts.Pipeline, "success", nil); err != nil {
+	if err := writeSummary(runDir, opts.Pipeline, "success", nil, ctx); err != nil {
 		return &RunResult{RunDir: runDir}, err
 	}
+	printSummary(os.Stdout, opts.Pipeline, "success", nil, ctx)
 
 	return &RunResult{RunDir: runDir}, nil
 }
@@ -107,23 +114,95 @@ func writeArtifactsSkeleton(runDir string, prompt string, plan []Node) error {
 	return nil
 }
 
-func writeSummary(runDir, pipeline, status string, err error) error {
-	summary := struct {
-		Pipeline string `json:"pipeline"`
-		Status   string `json:"status"`
-		Error    string `json:"error,omitempty"`
-		Time     string `json:"time"`
-	}{
+type StepIterationSummary struct {
+	Iteration int    `json:"iteration"`
+	ExitCode  int    `json:"exitCode"`
+	Duration  string `json:"duration"`
+	Command   string `json:"command"`
+	StdoutLog string `json:"stdoutLog"`
+	StderrLog string `json:"stderrLog"`
+}
+
+type StepSummary struct {
+	ID         string                 `json:"id"`
+	Iterations []StepIterationSummary `json:"iterations"`
+}
+
+type RunSummary struct {
+	Pipeline string        `json:"pipeline"`
+	Status   string        `json:"status"`
+	Error    string        `json:"error,omitempty"`
+	Time     string        `json:"time"`
+	RunDir   string        `json:"runDir"`
+	Steps    []StepSummary `json:"steps,omitempty"`
+}
+
+func writeSummary(runDir, pipeline, status string, err error, ctx *RunContext) error {
+	summary := buildSummary(runDir, pipeline, status, err, ctx)
+	raw, _ := json.MarshalIndent(summary, "", "  ")
+	content := "# moleman Run Summary\n\n" + string(raw) + "\n"
+	return os.WriteFile(filepath.Join(runDir, "summary.md"), []byte(content), 0o644)
+}
+
+func buildSummary(runDir, pipeline, status string, err error, ctx *RunContext) RunSummary {
+	summary := RunSummary{
 		Pipeline: pipeline,
 		Status:   status,
 		Time:     time.Now().Format(time.RFC3339),
+		RunDir:   runDir,
 	}
 	if err != nil {
 		summary.Error = err.Error()
 	}
-	raw, _ := json.MarshalIndent(summary, "", "  ")
-	content := "# moleman Run Summary\n\n" + string(raw) + "\n"
-	return os.WriteFile(filepath.Join(runDir, "summary.md"), []byte(content), 0o644)
+	if ctx == nil {
+		return summary
+	}
+	index := map[string]int{}
+	for _, exec := range ctx.StepOrder {
+		stepIdx, ok := index[exec.ID]
+		if !ok {
+			stepIdx = len(summary.Steps)
+			index[exec.ID] = stepIdx
+			summary.Steps = append(summary.Steps, StepSummary{ID: exec.ID})
+		}
+		history := ctx.StepsHistory[exec.ID]
+		if exec.Iteration-1 >= len(history) || exec.Iteration <= 0 {
+			continue
+		}
+		result := history[exec.Iteration-1]
+		iterSummary := StepIterationSummary{
+			Iteration: exec.Iteration,
+			ExitCode:  result.ExitCode,
+			Duration:  result.Duration,
+			Command:   result.Command,
+			StdoutLog: filepath.Join("steps", exec.ID, fmt.Sprintf("%02d", exec.Iteration), "stdout.log"),
+			StderrLog: filepath.Join("steps", exec.ID, fmt.Sprintf("%02d", exec.Iteration), "stderr.log"),
+		}
+		summary.Steps[stepIdx].Iterations = append(summary.Steps[stepIdx].Iterations, iterSummary)
+	}
+	return summary
+}
+
+func printSummary(out *os.File, pipeline, status string, err error, ctx *RunContext) {
+	fmt.Fprintln(out, "run summary:")
+	fmt.Fprintf(out, "  pipeline: %s\n", pipeline)
+	fmt.Fprintf(out, "  status: %s\n", status)
+	if err != nil {
+		fmt.Fprintf(out, "  error: %s\n", err.Error())
+	}
+	if ctx == nil || len(ctx.StepOrder) == 0 {
+		fmt.Fprintln(out, "  steps: none")
+		return
+	}
+	fmt.Fprintln(out, "  steps:")
+	for _, exec := range ctx.StepOrder {
+		history := ctx.StepsHistory[exec.ID]
+		if exec.Iteration-1 >= len(history) || exec.Iteration <= 0 {
+			continue
+		}
+		result := history[exec.Iteration-1]
+		fmt.Fprintf(out, "    - %s.%02d exit %d (%s)\n", exec.ID, exec.Iteration, result.ExitCode, result.Duration)
+	}
 }
 
 func loadPrompt(prompt, promptFile string) (string, error) {

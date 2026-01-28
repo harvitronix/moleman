@@ -20,6 +20,11 @@ type StepResult struct {
 	Command  string
 }
 
+type StepExecution struct {
+	ID        string
+	Iteration int
+}
+
 type RunContext struct {
 	Input        InputData
 	Git          GitData
@@ -29,6 +34,7 @@ type RunContext struct {
 	RunDir       string
 	Workdir      string
 	Verbose      bool
+	StepOrder    []StepExecution
 }
 
 func (ctx *RunContext) TemplateData() map[string]any {

@@ -34,9 +34,7 @@ func executeNodes(ctx *RunContext, nodes []Node, inLoop bool) error {
 
 func executeLoop(ctx *RunContext, node Node) error {
 	for i := 0; i < node.MaxIters; i++ {
-		if ctx.Verbose {
-			fmt.Printf("loop iteration %d/%d\n", i+1, node.MaxIters)
-		}
+		fmt.Printf("loop iteration %d/%d\n", i+1, node.MaxIters)
 		if err := executeNodes(ctx, node.Body, true); err != nil {
 			return err
 		}
@@ -47,6 +45,7 @@ func executeLoop(ctx *RunContext, node Node) error {
 			return fmt.Errorf("loop condition: %w", err)
 		}
 		if cond {
+			fmt.Printf("loop condition met after %d/%d iterations\n", i+1, node.MaxIters)
 			return nil
 		}
 	}
@@ -63,6 +62,13 @@ func executeRunNode(ctx *RunContext, node Node, inLoop bool) error {
 	if err != nil {
 		return err
 	}
+
+	iteration := len(ctx.StepsHistory[id]) + 1
+	command := strings.TrimSpace(templated.Run)
+	if command == "" {
+		command = "<empty>"
+	}
+	fmt.Printf("step %s.%02d start: %s\n", id, iteration, command)
 
 	result, err := runCommand(ctx, id, templated)
 	if err != nil {
@@ -205,6 +211,7 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 
 	ctx.Steps[id] = result
 	ctx.StepsHistory[id] = append(ctx.StepsHistory[id], result)
+	ctx.StepOrder = append(ctx.StepOrder, StepExecution{ID: id, Iteration: len(ctx.StepsHistory[id])})
 
 	if err := writeMeta(stepDir, result); err != nil {
 		return result, err
@@ -215,9 +222,7 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 		}
 	}
 
-	if ctx.Verbose {
-		fmt.Printf("step %s exit %d (%s)\n", id, exitCode, duration.String())
-	}
+	fmt.Printf("step %s.%02d done: exit %d (%s)\n", id, len(ctx.StepsHistory[id]), exitCode, duration.String())
 
 	return result, nil
 }

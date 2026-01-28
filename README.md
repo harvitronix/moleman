@@ -160,6 +160,7 @@ Each run creates:
 ## Examples
 
 See `examples/` for minimal and looped AI workflows.
+For a multi-agent review loop, check `examples/codex-claude-loop.yaml`.
 
 ## Etymology
 

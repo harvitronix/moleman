@@ -4,9 +4,14 @@ version: 1
 steps:
   codex_write:
     type: run
-    run: "codex exec --full-auto {{ shellEscape .input.prompt }}"
+    run: "mkdir -p .moleman/tmp && codex exec --full-auto {{ shellEscape .input.prompt }} --output-last-message .moleman/tmp/codex_write_last.txt"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
+
+  show_codex_write_last:
+    type: run
+    run: "printf '\\n--- codex_write last message ---\\n' && (cat .moleman/tmp/codex_write_last.txt 2>/dev/null || true)"
+    print: [stdout]
 
   prep_review:
     type: run
@@ -18,12 +23,22 @@ steps:
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
+  show_codex_review_last:
+    type: run
+    run: "printf '\\n--- codex_review last message ---\\n' && (cat .moleman/tmp/review.txt 2>/dev/null || true)"
+    print: [stdout]
+
   codex_apply_review:
     type: run
-    run: "codex exec --full-auto 'Apply the review feedback below. Only change what is required.'"
+    run: "codex exec --full-auto 'Apply the review feedback below. Only change what is required.' --output-last-message .moleman/tmp/codex_apply_review_last.txt"
     stdinFile: ".moleman/tmp/review.txt"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
+
+  show_codex_apply_review_last:
+    type: run
+    run: "printf '\\n--- codex_apply_review last message ---\\n' && (cat .moleman/tmp/codex_apply_review_last.txt 2>/dev/null || true)"
+    print: [stdout]
 
   test:
     type: run
@@ -40,11 +55,17 @@ groups:
     - type: ref
       id: codex_write
     - type: ref
+      id: show_codex_write_last
+    - type: ref
       id: prep_review
     - type: ref
       id: codex_review
     - type: ref
+      id: show_codex_review_last
+    - type: ref
       id: codex_apply_review
+    - type: ref
+      id: show_codex_apply_review_last
     - type: ref
       id: test
     - type: ref

@@ -15,6 +15,7 @@ type Step struct {
 	Env       map[string]string `yaml:"env,omitempty"`
 	Timeout   string            `yaml:"timeout,omitempty"`
 	Capture   []string          `yaml:"capture,omitempty"`
+	Print     []string          `yaml:"print,omitempty"`
 	Parse     *ParseConfig      `yaml:"parse,omitempty"`
 	Shell     string            `yaml:"shell,omitempty"`
 }
@@ -28,6 +29,7 @@ type Node struct {
 	Env       map[string]string `yaml:"env,omitempty"`
 	Timeout   string            `yaml:"timeout,omitempty"`
 	Capture   []string          `yaml:"capture,omitempty"`
+	Print     []string          `yaml:"print,omitempty"`
 	Parse     *ParseConfig      `yaml:"parse,omitempty"`
 	Shell     string            `yaml:"shell,omitempty"`
 

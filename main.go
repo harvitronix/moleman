@@ -224,11 +224,12 @@ func configureLogging() {
 	log.SetColorProfile(termenv.TrueColor)
 
 	styles := log.DefaultStyles()
+	primary := lipgloss.Color("#c98301")
 	styles.Levels[log.DebugLevel] = styles.Levels[log.DebugLevel].Foreground(lipgloss.Color("69")).Bold(true)
-	styles.Levels[log.InfoLevel] = styles.Levels[log.InfoLevel].Foreground(lipgloss.Color("86")).Bold(true)
+	styles.Levels[log.InfoLevel] = styles.Levels[log.InfoLevel].Foreground(primary).Bold(true)
 	styles.Levels[log.WarnLevel] = styles.Levels[log.WarnLevel].Foreground(lipgloss.Color("220")).Bold(true)
 	styles.Levels[log.ErrorLevel] = styles.Levels[log.ErrorLevel].Foreground(lipgloss.Color("196")).Bold(true)
-	styles.Prefix = styles.Prefix.Foreground(lipgloss.Color("245")).Bold(true)
+	styles.Prefix = styles.Prefix.Foreground(primary).Bold(true)
 	styles.Key = styles.Key.Foreground(lipgloss.Color("244"))
 	log.SetStyles(styles)
 }

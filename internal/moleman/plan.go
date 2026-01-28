@@ -93,6 +93,7 @@ func nodeFromStep(id string, step Step) Node {
 		Env:       step.Env,
 		Timeout:   step.Timeout,
 		Capture:   step.Capture,
+		Print:     step.Print,
 		Parse:     step.Parse,
 		Shell:     step.Shell,
 	}

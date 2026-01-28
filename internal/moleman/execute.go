@@ -185,12 +185,14 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 
 	captureStdout := shouldCapture(node.Capture, "stdout")
 	captureStderr := shouldCapture(node.Capture, "stderr")
+	printStdout := shouldPrint(node.Print, "stdout")
+	printStderr := shouldPrint(node.Print, "stderr")
 
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
 
-	cmd.Stdout = writerFor(stdoutFile, &stdoutBuf, captureStdout)
-	cmd.Stderr = writerFor(stderrFile, &stderrBuf, captureStderr)
+	cmd.Stdout = writerFor(stdoutFile, &stdoutBuf, captureStdout, pickWriter(printStdout, os.Stdout))
+	cmd.Stderr = writerFor(stderrFile, &stderrBuf, captureStderr, pickWriter(printStderr, os.Stderr))
 
 	start := time.Now()
 	runErr := cmd.Run()
@@ -242,11 +244,18 @@ func resolveStdin(stdin, stdinFile string) (string, error) {
 	return string(raw), nil
 }
 
-func writerFor(file *os.File, buf *bytes.Buffer, capture bool) io.Writer {
+func writerFor(file *os.File, buf *bytes.Buffer, capture bool, printTo io.Writer) io.Writer {
+	writers := []io.Writer{file}
 	if capture {
-		return io.MultiWriter(file, buf)
+		writers = append(writers, buf)
 	}
-	return file
+	if printTo != nil {
+		writers = append(writers, printTo)
+	}
+	if len(writers) == 1 {
+		return writers[0]
+	}
+	return io.MultiWriter(writers...)
 }
 
 func shouldCapture(capture []string, value string) bool {
@@ -259,6 +268,25 @@ func shouldCapture(capture []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func shouldPrint(print []string, value string) bool {
+	if len(print) == 0 {
+		return false
+	}
+	for _, item := range print {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+func pickWriter(enabled bool, writer io.Writer) io.Writer {
+	if enabled {
+		return writer
+	}
+	return nil
 }
 
 func stepRunDir(runDir, id string, iteration int) (string, error) {

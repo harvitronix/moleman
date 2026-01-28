@@ -92,6 +92,7 @@ Step (`type: run`):
 - `env` (map, optional)
 - `timeout` (string duration, optional)
 - `capture` (list, optional: `stdout`, `stderr`, `exitCode`)
+- `print` (list, optional: `stdout`, `stderr`)
 - `parse` (optional: `kind: json`, `into: <key>`)
 - `shell` (string, optional)
 
@@ -151,3 +152,11 @@ Each run creates:
 ## Examples
 
 See `examples/` for minimal and looped AI workflows.
+
+## Etymology
+
+This project is named after Hans Moleman, the eternally unlucky Springfield everyman who somehow keeps coming back no matter how many times the universe
+drops a piano on him. `moleman` might get knocked around by failed runs, exploding diffs, and wild reviews, yet
+is ready to resurface with a fresh go at the workflow. If Moleman can survive 44 on‑screen deaths, `moleman` can
+survive a few yolo blunders and keep going.
+

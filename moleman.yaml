@@ -10,7 +10,7 @@ steps:
 
   codex_review:
     type: run
-    run: "codex exec 'Review the changes and list must-fix issues based on the current git diff.' --output-last-message .moleman/tmp/review.txt"
+    run: "codex exec 'Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent.' --output-last-message .moleman/tmp/review.txt"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 

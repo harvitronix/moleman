@@ -41,7 +41,7 @@ steps:
   code:
     type: run
     # Replace with your local AI CLI command
-    run: "ai-code --non-interactive --prompt {{ shellEscape .input.prompt }} --context {{ shellEscape .git.diff }}"
+    run: "ai-code --non-interactive --prompt {{ shellEscape (printf \"%s\\n\\nDo not offer next steps or additional tasks; just return the requested output.\" .input.prompt) }} --context {{ shellEscape .git.diff }}"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
@@ -159,4 +159,3 @@ This project is named after Hans Moleman, the eternally unlucky Springfield ever
 drops a piano on him. `moleman` might get knocked around by failed runs, exploding diffs, and wild reviews, yet
 is ready to resurface with a fresh go at the workflow. If Moleman can survive 44 on‑screen deaths, `moleman` can
 survive a few yolo blunders and keep going.
-

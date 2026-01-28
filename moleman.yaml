@@ -4,7 +4,7 @@ version: 1
 steps:
   codex_write:
     type: run
-    run: "mkdir -p .moleman/tmp && codex exec --full-auto {{ shellEscape .input.prompt }} --output-last-message .moleman/tmp/codex_write_last.txt"
+    run: "mkdir -p .moleman/tmp && codex exec --full-auto {{ shellEscape (printf \"%s\\n\\nDo not offer next steps or additional tasks; just return the requested output.\" .input.prompt) }} --output-last-message .moleman/tmp/codex_write_last.txt"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 
@@ -19,7 +19,7 @@ steps:
 
   codex_review:
     type: run
-    run: "codex exec {{ shellEscape (printf \"Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent.\\n\\nOriginal prompt that produced this diff (for context):\\n%s\" .input.prompt) }} --output-last-message .moleman/tmp/review.txt"
+    run: "codex exec {{ shellEscape (printf \"Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent. Do not offer next steps or additional tasks.\\n\\nOriginal prompt that produced this diff (for context):\\n%s\" .input.prompt) }} --output-last-message .moleman/tmp/review.txt"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
@@ -30,7 +30,7 @@ steps:
 
   codex_apply_review:
     type: run
-    run: "{ printf 'Apply the review feedback below. Only change what is required.\\n\\n'; cat .moleman/tmp/review.txt; } | codex exec --full-auto --output-last-message .moleman/tmp/codex_apply_review_last.txt"
+    run: "{ printf 'Apply the review feedback below. Only change what is required. Do not offer next steps or additional tasks.\\n\\n'; cat .moleman/tmp/review.txt; } | codex exec --full-auto --output-last-message .moleman/tmp/codex_apply_review_last.txt"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 

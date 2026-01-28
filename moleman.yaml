@@ -1,0 +1,27 @@
+# Example config; customize for your workflow before use.
+version: 1
+
+steps:
+  lint:
+    type: run
+    run: "pnpm lint"
+    timeout: 10m
+    capture: [stdout, stderr, exitCode]
+
+  tests:
+    type: run
+    run: "pnpm test"
+    timeout: 20m
+
+groups:
+  core:
+    - type: ref
+      id: lint
+    - type: ref
+      id: tests
+
+pipelines:
+  default:
+    plan:
+      - type: ref
+        id: core

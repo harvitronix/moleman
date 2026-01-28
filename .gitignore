@@ -1,0 +1,9 @@
+/.moleman/
+/moleman
+/moleman.exe
+/moleman.test
+/bin/
+/tmp/
+*.out
+*.coverprofile
+/vendor/

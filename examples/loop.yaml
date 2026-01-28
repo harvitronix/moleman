@@ -1,0 +1,34 @@
+version: 1
+
+steps:
+  code:
+    type: run
+    run: "ai-code --non-interactive --prompt '{{ .input.prompt }}' --context '{{ .git.diff }}'"
+    timeout: 30m
+    capture: [stdout, stderr, exitCode]
+
+  lint:
+    type: run
+    run: "pnpm lint"
+    capture: [stdout, stderr, exitCode]
+
+  review:
+    type: run
+    run: "ai-review --non-interactive --diff '{{ .git.diff }}' --out review.json"
+    parse:
+      kind: json
+      into: review
+
+pipelines:
+  heavy:
+    plan:
+      - type: loop
+        maxIters: 3
+        until: "steps.lint.exitCode == 0 && vars.review.mustFixCount == 0"
+        body:
+          - type: ref
+            id: code
+          - type: ref
+            id: lint
+          - type: ref
+            id: review

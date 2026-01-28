@@ -68,11 +68,7 @@ func executeRunNode(ctx *RunContext, node Node, inLoop bool) error {
 	}
 
 	iteration := len(ctx.StepsHistory[id]) + 1
-	command := strings.TrimSpace(templated.Run)
-	if command == "" {
-		command = "<empty>"
-	}
-	log.Info("step start", "step", id, "iteration", fmt.Sprintf("%02d", iteration), "command", command)
+	log.Info("step start", "step", id, "iteration", fmt.Sprintf("%02d", iteration))
 
 	result, err := runCommand(ctx, id, templated)
 	if err != nil {
@@ -191,8 +187,10 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
 
-	cmd.Stdout = writerFor(stdoutFile, &stdoutBuf, captureStdout, pickWriter(printStdout, os.Stdout))
-	cmd.Stderr = writerFor(stderrFile, &stderrBuf, captureStderr, pickWriter(printStderr, os.Stderr))
+	stdoutTracker := &outputTracker{}
+	stderrTracker := &outputTracker{}
+	cmd.Stdout = writerFor(stdoutFile, &stdoutBuf, captureStdout, pickWriter(printStdout, os.Stdout), stdoutTracker)
+	cmd.Stderr = writerFor(stderrFile, &stderrBuf, captureStderr, pickWriter(printStderr, os.Stderr), stderrTracker)
 
 	start := time.Now()
 	runErr := cmd.Run()
@@ -205,6 +203,13 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 
 	if ctxExec.Err() == context.DeadlineExceeded {
 		exitCode = 124
+	}
+
+	if printStdout && stdoutTracker.wrote && stdoutTracker.lastByte != '\n' {
+		fmt.Fprintln(os.Stdout)
+	}
+	if printStderr && stderrTracker.wrote && stderrTracker.lastByte != '\n' {
+		fmt.Fprintln(os.Stderr)
 	}
 
 	result := StepResult{
@@ -244,13 +249,16 @@ func resolveStdin(stdin, stdinFile string) (string, error) {
 	return string(raw), nil
 }
 
-func writerFor(file *os.File, buf *bytes.Buffer, capture bool, printTo io.Writer) io.Writer {
+func writerFor(file *os.File, buf *bytes.Buffer, capture bool, printTo io.Writer, tracker *outputTracker) io.Writer {
 	writers := []io.Writer{file}
 	if capture {
 		writers = append(writers, buf)
 	}
 	if printTo != nil {
 		writers = append(writers, printTo)
+	}
+	if tracker != nil {
+		writers = append(writers, tracker)
 	}
 	if len(writers) == 1 {
 		return writers[0]
@@ -287,6 +295,19 @@ func pickWriter(enabled bool, writer io.Writer) io.Writer {
 		return writer
 	}
 	return nil
+}
+
+type outputTracker struct {
+	lastByte byte
+	wrote    bool
+}
+
+func (t *outputTracker) Write(p []byte) (int, error) {
+	if len(p) > 0 {
+		t.lastByte = p[len(p)-1]
+		t.wrote = true
+	}
+	return len(p), nil
 }
 
 func stepRunDir(runDir, id string, iteration int) (string, error) {

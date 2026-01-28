@@ -30,8 +30,7 @@ steps:
 
   codex_apply_review:
     type: run
-    run: "codex exec --full-auto 'Apply the review feedback below. Only change what is required.' --output-last-message .moleman/tmp/codex_apply_review_last.txt"
-    stdinFile: ".moleman/tmp/review.txt"
+    run: "{ printf 'Apply the review feedback below. Only change what is required.\\n\\n'; cat .moleman/tmp/review.txt; } | codex exec --full-auto --output-last-message .moleman/tmp/codex_apply_review_last.txt"
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 

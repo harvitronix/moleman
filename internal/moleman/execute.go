@@ -255,7 +255,7 @@ func writerFor(file *os.File, buf *bytes.Buffer, capture bool, printTo io.Writer
 		writers = append(writers, buf)
 	}
 	if printTo != nil {
-		writers = append(writers, printTo)
+		writers = append(writers, wrapPrintWriter(printTo))
 	}
 	if tracker != nil {
 		writers = append(writers, tracker)
@@ -295,6 +295,25 @@ func pickWriter(enabled bool, writer io.Writer) io.Writer {
 		return writer
 	}
 	return nil
+}
+
+type printWrapper struct {
+	writer  io.Writer
+	wrapped bool
+}
+
+func wrapPrintWriter(writer io.Writer) *printWrapper {
+	return &printWrapper{writer: writer}
+}
+
+func (p *printWrapper) Write(data []byte) (int, error) {
+	if !p.wrapped {
+		if _, err := p.writer.Write([]byte("\n")); err != nil {
+			return 0, err
+		}
+		p.wrapped = true
+	}
+	return p.writer.Write(data)
 }
 
 type outputTracker struct {

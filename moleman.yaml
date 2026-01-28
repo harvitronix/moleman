@@ -10,7 +10,7 @@ steps:
 
   show_codex_write_last:
     type: run
-    run: "printf '\\n--- codex_write last message ---\\n' && (cat .moleman/tmp/codex_write_last.txt 2>/dev/null || true)"
+    run: "(cat .moleman/tmp/codex_write_last.txt 2>/dev/null || true)"
     print: [stdout]
 
   prep_review:
@@ -25,8 +25,9 @@ steps:
 
   show_codex_review_last:
     type: run
-    run: "printf '\\n--- codex_review last message ---\\n' && (cat .moleman/tmp/review.txt 2>/dev/null || true)"
+    run: "(cat .moleman/tmp/review.txt 2>/dev/null || true)"
     print: [stdout]
+    capture: [stdout, stderr, exitCode]
 
   codex_apply_review:
     type: run
@@ -36,8 +37,9 @@ steps:
 
   show_codex_apply_review_last:
     type: run
-    run: "printf '\\n--- codex_apply_review last message ---\\n' && (cat .moleman/tmp/codex_apply_review_last.txt 2>/dev/null || true)"
+    run: "(cat .moleman/tmp/codex_apply_review_last.txt 2>/dev/null || true)"
     print: [stdout]
+    capture: [stdout, stderr, exitCode]
 
   test:
     type: run

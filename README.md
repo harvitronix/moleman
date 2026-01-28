@@ -6,6 +6,14 @@ artifacts per run for review and auditing.
 
 > Status: early prototype. Expect breaking config and CLI changes.
 
+## Motivation
+
+I often find myself bouncing between sessions that write code and sessions
+that review it. Especially in Ralph loops, the write → review → write
+orchestration gets tedious. `moleman` makes it easy to define and reuse those
+loops across different tools, while keeping the workflow explicit and
+repeatable.
+
 ## Install (from repo)
 
 ```

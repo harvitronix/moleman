@@ -6,10 +6,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
+	"github.com/muesli/termenv"
 	"moleman/internal/moleman"
 )
 
 func main() {
+	configureLogging()
+	log.SetLevel(log.InfoLevel)
+
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
@@ -29,7 +35,7 @@ func main() {
 	case "-h", "--help", "help":
 		usage()
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		log.Error("unknown command", "command", os.Args[1])
 		usage()
 		os.Exit(2)
 	}
@@ -58,6 +64,10 @@ func runCmd(args []string) {
 	verbose := fs.Bool("verbose", false, "verbose logging")
 	fs.Parse(args)
 
+	if *verbose {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	cfgPath := resolveConfigPath(*configPath, *workdir)
 	cfg, err := moleman.LoadConfig(cfgPath)
 	if err != nil {
@@ -76,12 +86,12 @@ func runCmd(args []string) {
 	result, err := moleman.Run(cfg, cfgPath, runOpts)
 	if err != nil {
 		if result != nil && result.RunDir != "" {
-			fmt.Fprintf(os.Stderr, "run artifacts: %s\n", result.RunDir)
+			log.Warn("run artifacts", "path", result.RunDir)
 		}
 		exitErr(err)
 	}
 
-	fmt.Printf("run succeeded: %s\n", result.RunDir)
+	log.Info("run succeeded", "path", result.RunDir)
 }
 
 func pipelinesCmd(args []string) {
@@ -136,7 +146,7 @@ func initCmd(args []string) {
 	if err := moleman.Init(cfgPath, *force); err != nil {
 		exitErr(err)
 	}
-	fmt.Printf("created: %s\n", cfgPath)
+	log.Info("created", "path", cfgPath)
 }
 
 func doctorCmd(args []string) {
@@ -149,7 +159,7 @@ func doctorCmd(args []string) {
 	if err := moleman.Doctor(cfgPath); err != nil {
 		exitErr(err)
 	}
-	fmt.Println("doctor ok")
+	log.Info("doctor ok")
 }
 
 func resolveConfigPath(configPath, workdir string) string {
@@ -203,6 +213,22 @@ func homeConfigPath() string {
 }
 
 func exitErr(err error) {
-	fmt.Fprintln(os.Stderr, err.Error())
+	log.Error(err.Error())
 	os.Exit(1)
+}
+
+func configureLogging() {
+	log.SetReportTimestamp(true)
+	log.SetTimeFormat("15:04:05")
+	log.SetPrefix("moleman")
+	log.SetColorProfile(termenv.TrueColor)
+
+	styles := log.DefaultStyles()
+	styles.Levels[log.DebugLevel] = styles.Levels[log.DebugLevel].Foreground(lipgloss.Color("69")).Bold(true)
+	styles.Levels[log.InfoLevel] = styles.Levels[log.InfoLevel].Foreground(lipgloss.Color("86")).Bold(true)
+	styles.Levels[log.WarnLevel] = styles.Levels[log.WarnLevel].Foreground(lipgloss.Color("220")).Bold(true)
+	styles.Levels[log.ErrorLevel] = styles.Levels[log.ErrorLevel].Foreground(lipgloss.Color("196")).Bold(true)
+	styles.Prefix = styles.Prefix.Foreground(lipgloss.Color("245")).Bold(true)
+	styles.Key = styles.Key.Foreground(lipgloss.Color("244"))
+	log.SetStyles(styles)
 }

@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
 
 type RunOptions struct {
@@ -65,8 +67,8 @@ func Run(cfg *Config, cfgPath string, opts RunOptions) (*RunResult, error) {
 		StepOrder:    []StepExecution{},
 	}
 
-	fmt.Printf("run started: pipeline %s\n", opts.Pipeline)
-	fmt.Printf("run artifacts: %s\n", runDir)
+	log.Info("run started", "pipeline", opts.Pipeline)
+	log.Info("run artifacts", "path", runDir)
 
 	if opts.DryRun {
 		if err := writeSummary(runDir, opts.Pipeline, "dry-run", nil, ctx); err != nil {

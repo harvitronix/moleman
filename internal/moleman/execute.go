@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
 )
 
 func executeNodes(ctx *RunContext, nodes []Node, inLoop bool) error {
@@ -34,7 +36,9 @@ func executeNodes(ctx *RunContext, nodes []Node, inLoop bool) error {
 
 func executeLoop(ctx *RunContext, node Node) error {
 	for i := 0; i < node.MaxIters; i++ {
-		fmt.Printf("loop iteration %d/%d\n", i+1, node.MaxIters)
+		if ctx.Verbose {
+			log.Debugf("loop iteration %d/%d", i+1, node.MaxIters)
+		}
 		if err := executeNodes(ctx, node.Body, true); err != nil {
 			return err
 		}
@@ -45,7 +49,7 @@ func executeLoop(ctx *RunContext, node Node) error {
 			return fmt.Errorf("loop condition: %w", err)
 		}
 		if cond {
-			fmt.Printf("loop condition met after %d/%d iterations\n", i+1, node.MaxIters)
+			log.Info("loop condition met", "iteration", i+1, "max", node.MaxIters)
 			return nil
 		}
 	}
@@ -68,7 +72,7 @@ func executeRunNode(ctx *RunContext, node Node, inLoop bool) error {
 	if command == "" {
 		command = "<empty>"
 	}
-	fmt.Printf("step %s.%02d start: %s\n", id, iteration, command)
+	log.Info("step start", "step", id, "iteration", fmt.Sprintf("%02d", iteration), "command", command)
 
 	result, err := runCommand(ctx, id, templated)
 	if err != nil {
@@ -222,7 +226,7 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 		}
 	}
 
-	fmt.Printf("step %s.%02d done: exit %d (%s)\n", id, len(ctx.StepsHistory[id]), exitCode, duration.String())
+	log.Info("step done", "step", id, "iteration", fmt.Sprintf("%02d", len(ctx.StepsHistory[id])), "exit", exitCode, "duration", duration.String())
 
 	return result, nil
 }

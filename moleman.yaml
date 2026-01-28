@@ -8,9 +8,13 @@ steps:
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 
+  prep_review:
+    type: run
+    run: "mkdir -p .moleman/tmp"
+
   codex_review:
     type: run
-    run: "codex exec 'Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent.' --output-last-message .moleman/tmp/review.txt"
+    run: "codex exec {{ shellEscape (printf \"Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent.\\n\\nOriginal prompt that produced this diff (for context):\\n%s\" .input.prompt) }} --output-last-message .moleman/tmp/review.txt"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
@@ -35,6 +39,8 @@ groups:
   dogfood:
     - type: ref
       id: codex_write
+    - type: ref
+      id: prep_review
     - type: ref
       id: codex_review
     - type: ref

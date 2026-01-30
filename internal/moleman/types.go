@@ -10,6 +10,8 @@ type AgentConfig struct {
 	Extends string            `yaml:"extends,omitempty"`
 	Type    string            `yaml:"type"`
 	Command string            `yaml:"command,omitempty"`
+	Model   string            `yaml:"model,omitempty"`
+	Thinking string           `yaml:"thinking,omitempty"`
 	Args    []string          `yaml:"args,omitempty"`
 	OutputSchema string       `yaml:"outputSchema,omitempty"`
 	OutputFile   string       `yaml:"outputFile,omitempty"`

@@ -75,7 +75,7 @@ func executeAgentNode(ctx *RunContext, cfg *Config, item WorkflowItem) error {
 		return err
 	}
 
-	stdoutBuf, _, exitCode, duration, err := runCommand(ctx, item.Name, item.Agent, command, args, agent, stepDir, input)
+	stdoutBuf, stderrBuf, exitCode, duration, err := runCommand(ctx, item.Name, item.Agent, command, args, agent, stepDir, input)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,12 @@ func executeAgentNode(ctx *RunContext, cfg *Config, item WorkflowItem) error {
 	})
 
 	if exitCode != 0 {
-		return fmt.Errorf("node failed: %s (exit %d)", item.Name, exitCode)
+		stderrSummary := summarizeStderr(stderrBuf)
+		stderrPath := filepath.Join(stepDir, "stderr.log")
+		if stderrSummary != "" {
+			return fmt.Errorf("node failed: %s (exit %d). stderr: %s (see %s)", item.Name, exitCode, stderrSummary, stderrPath)
+		}
+		return fmt.Errorf("node failed: %s (exit %d). see %s", item.Name, exitCode, stderrPath)
 	}
 
 	log.Info("node done", "name", item.Name, "agent", item.Agent, "exit", exitCode, "duration", duration)
@@ -153,6 +158,7 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 	session := effectiveSession(agent.Session, item.Session)
 	args := []string{}
 	templateData := ctx.TemplateData()
+	modelArgs := buildModelArgs(agent)
 	outputSchema := agent.OutputSchema
 	if outputSchema != "" {
 		resolved, err := RenderTemplate(outputSchema, templateData)
@@ -177,6 +183,7 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 		} else {
 			args = append(args, "exec")
 		}
+		args = append(args, modelArgs...)
 		args = append(args, agent.Args...)
 		if outputSchema != "" {
 			args = append(args, "--output-schema", outputSchema)
@@ -187,6 +194,7 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 		args = append(args, input)
 	case "claude":
 		args = append(args, "-p", input)
+		args = append(args, modelArgs...)
 		args = append(args, agent.Args...)
 		if session.Resume == "last" {
 			sessionID := ctx.Sessions["claude"]
@@ -208,6 +216,24 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 	}
 
 	return command, args, nil
+}
+
+func buildModelArgs(agent AgentConfig) []string {
+	args := []string{}
+	switch agent.Type {
+	case "codex":
+		if agent.Model != "" {
+			args = append(args, "--model", agent.Model)
+		}
+		if agent.Thinking != "" {
+			args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%s", agent.Thinking))
+		}
+	case "claude":
+		if agent.Model != "" {
+			args = append(args, "--model", agent.Model)
+		}
+	}
+	return args
 }
 
 func effectiveSession(agentSession *SessionSpec, nodeSession SessionSpec) SessionSpec {
@@ -383,6 +409,21 @@ func outputAsString(value any) (string, error) {
 		}
 		return string(raw), nil
 	}
+}
+
+func summarizeStderr(buf *bytes.Buffer) string {
+	if buf == nil || buf.Len() == 0 {
+		return ""
+	}
+	text := strings.TrimSpace(buf.String())
+	if text == "" {
+		return ""
+	}
+	const maxLen = 4000
+	if len(text) <= maxLen {
+		return text
+	}
+	return "...(truncated)...\n" + text[len(text)-maxLen:]
 }
 
 func nodeRunDir(runDir, name string) (string, error) {

@@ -1,5 +1,26 @@
 version: 1
 
+agents:
+  claude_review:
+    extends: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - '{"type":"object","properties":{"must_fix_count":{"type":"integer"},"must_fix_items":{"type":"array","items":{"type":"string"}}},"required":["must_fix_count","must_fix_items"],"additionalProperties":false}'
+      - "--allowedTools"
+      - "Bash(git diff *),Bash(git status *),Read"
+
+  claude_rereview:
+    extends: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - '{"type":"object","properties":{"must_fix_count":{"type":"integer"},"must_fix_items":{"type":"array","items":{"type":"string"}}},"required":["must_fix_count","must_fix_items"],"additionalProperties":false}'
+      - "--allowedTools"
+      - "Bash(git diff *),Bash(git status *),Read"
+
 workflow:
   - type: agent
     name: write
@@ -15,7 +36,7 @@ workflow:
     body:
       - type: agent
         name: review
-        agent: claude
+        agent: claude_review
         input:
           prompt: "Review the current git diff and list must-fix issues."
         output:
@@ -33,7 +54,7 @@ workflow:
 
       - type: agent
         name: rereview
-        agent: claude
+        agent: claude_rereview
         session:
           resume: last
         input:

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix review schema required fields and show stderr in node failures.
+
 ## 0.1.1
 
 - Ship shared `agents.yaml` defaults and agent `extends` overrides.

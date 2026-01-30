@@ -91,12 +91,30 @@ func ValidateConfig(cfg *Config) error {
 		if agent.Type == "generic" && agent.Command == "" {
 			return fmt.Errorf("agent %s type generic requires command", name)
 		}
+		if agent.Model != "" && agent.Type == "generic" {
+			return fmt.Errorf("agent %s model is only supported for codex or claude", name)
+		}
+		if agent.Thinking != "" && agent.Type != "codex" {
+			return fmt.Errorf("agent %s thinking is only supported for codex", name)
+		}
+		if agent.Thinking != "" && !isValidCodexThinking(agent.Thinking) {
+			return fmt.Errorf("agent %s thinking must be one of minimal, low, medium, high, xhigh", name)
+		}
 	}
 	seenNames := map[string]bool{}
 	if err := validateWorkflow(cfg, cfg.Workflow, seenNames); err != nil {
 		return err
 	}
 	return nil
+}
+
+func isValidCodexThinking(value string) bool {
+	switch value {
+	case "minimal", "low", "medium", "high", "xhigh":
+		return true
+	default:
+		return false
+	}
 }
 
 func loadBaseAgents(configPath string) (map[string]AgentConfig, error) {
@@ -155,6 +173,12 @@ func mergeAgentConfig(base, override AgentConfig) AgentConfig {
 	}
 	if override.Command != "" {
 		result.Command = override.Command
+	}
+	if override.Model != "" {
+		result.Model = override.Model
+	}
+	if override.Thinking != "" {
+		result.Thinking = override.Thinking
 	}
 	if override.Args != nil {
 		result.Args = override.Args

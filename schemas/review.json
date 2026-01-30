@@ -14,6 +14,6 @@
       "type": "string"
     }
   },
-  "required": ["must_fix_count", "must_fix_items"],
+  "required": ["must_fix_count", "must_fix_items", "notes"],
   "additionalProperties": false
 }

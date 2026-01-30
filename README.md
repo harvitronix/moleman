@@ -224,7 +224,10 @@ Define shared agent presets once per repo so workflows stay small:
 agents:
   codex:
     type: codex
-    args: ["--full-auto"]
+    args:
+      - "--full-auto"
+    model: gpt-5-codex
+    thinking: medium
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 ```
@@ -235,8 +238,18 @@ Override defaults in `moleman.yaml` when needed:
 agents:
   codex_review:
     extends: codex
-    args: ["--full-auto"] # add model/thinking flags for your CLI here
+    model: gpt-5-codex
+    thinking: high
+    args: ["--full-auto"] # any additional flags
     outputSchema: "schemas/review.json"
+
+  claude_review:
+    extends: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - "./schemas/review.json"
 ```
 
 ### Example loop (write -> review -> write)
@@ -292,6 +305,8 @@ Agent config:
 - `extends` (string, optional; name of an agent in `agents.yaml`)
 - `type` (string, required: `codex`, `claude`, `generic`)
 - `command` (string, required for `generic`, optional otherwise)
+- `model` (string, optional; supported by `codex` and `claude`)
+- `thinking` (string, optional; supported by `codex` only: `minimal|low|medium|high|xhigh`)
 - `args` (list, optional)
 - `outputSchema` (string, optional; Codex JSON schema file)
 - `outputFile` (string, optional; writes last message to a file)

@@ -256,6 +256,9 @@ func runCommand(ctx *RunContext, nodeName, agentName, command string, args []str
 
 	exitCode := 0
 	if runErr != nil {
+		if errors.Is(runErr, exec.ErrNotFound) {
+			return &stdoutBuf, &stderrBuf, 127, duration, fmt.Errorf("command not found: %s", command)
+		}
 		exitCode = exitCodeFromErr(runErr)
 	}
 

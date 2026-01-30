@@ -7,6 +7,7 @@ type Config struct {
 }
 
 type AgentConfig struct {
+	Extends string            `yaml:"extends,omitempty"`
 	Type    string            `yaml:"type"`
 	Command string            `yaml:"command,omitempty"`
 	Args    []string          `yaml:"args,omitempty"`

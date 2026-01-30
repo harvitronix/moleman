@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -57,6 +59,11 @@ func Run(cfg *Config, cfgPath string, opts RunOptions) (*RunResult, error) {
 		NodeResults: []NodeResult{},
 	}
 
+	if err := ensureAgentCommands(cfg, ctx.Workdir); err != nil {
+		writeSummary(runDir, "failed", err, ctx)
+		return &RunResult{RunDir: runDir}, err
+	}
+
 	log.Info("run started", "nodes", len(cfg.Workflow))
 	log.Info("run artifacts", "path", runDir)
 
@@ -77,6 +84,73 @@ func Run(cfg *Config, cfgPath string, opts RunOptions) (*RunResult, error) {
 	}
 
 	return &RunResult{RunDir: runDir}, nil
+}
+
+func ensureAgentCommands(cfg *Config, workdir string) error {
+	usedAgents := map[string]struct{}{}
+	collectAgentNames(cfg.Workflow, usedAgents)
+	for name := range usedAgents {
+		agent, ok := cfg.Agents[name]
+		if !ok {
+			continue
+		}
+		command := resolveAgentCommand(agent)
+		if command == "" {
+			return fmt.Errorf("agent %s has no command configured", name)
+		}
+		if err := commandAvailable(command, workdir); err != nil {
+			return fmt.Errorf("agent %s command not found: %s (%w)", name, command, err)
+		}
+	}
+	return nil
+}
+
+func collectAgentNames(items []WorkflowItem, used map[string]struct{}) {
+	for _, item := range items {
+		switch item.Type {
+		case "agent":
+			if item.Agent != "" {
+				used[item.Agent] = struct{}{}
+			}
+		case "loop":
+			collectAgentNames(item.Body, used)
+		}
+	}
+}
+
+func resolveAgentCommand(agent AgentConfig) string {
+	if agent.Command != "" {
+		return agent.Command
+	}
+	switch agent.Type {
+	case "codex":
+		return "codex"
+	case "claude":
+		return "claude"
+	default:
+		return ""
+	}
+}
+
+func commandAvailable(command, workdir string) error {
+	if filepath.IsAbs(command) {
+		if _, err := os.Stat(command); err != nil {
+			return err
+		}
+		return nil
+	}
+	if strings.Contains(command, "/") {
+		path := command
+		if !filepath.IsAbs(path) && workdir != "" {
+			path = filepath.Join(workdir, path)
+		}
+		if _, err := os.Stat(path); err != nil {
+			return err
+		}
+		return nil
+	}
+	_, err := exec.LookPath(command)
+	return err
 }
 
 func writeArtifactsSkeleton(runDir string, input string, workflow []WorkflowItem) error {

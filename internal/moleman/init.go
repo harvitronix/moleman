@@ -8,13 +8,6 @@ import (
 
 const defaultConfig = `version: 1
 
-agents:
-  codex:
-    type: codex
-    args: ["--full-auto"]
-    timeout: 45m
-    capture: [stdout, stderr, exitCode]
-
 workflow:
   - type: agent
     name: write

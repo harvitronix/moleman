@@ -21,14 +21,7 @@ func main() {
 		Usage:                "agent-assisted workflow runner",
 		Version:              Version,
 		EnableBashCompletion: true,
-		Flags: []cli.Flag{
-			&cli.BoolFlag{Name: "version", Aliases: []string{"v"}, Usage: "print version"},
-		},
 		Action: func(c *cli.Context) error {
-			if c.Bool("version") {
-				fmt.Println(Version)
-				return nil
-			}
 			return cli.ShowAppHelp(c)
 		},
 		Commands: []*cli.Command{

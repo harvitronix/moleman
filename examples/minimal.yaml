@@ -1,12 +1,5 @@
 version: 1
 
-agents:
-  codex:
-    type: codex
-    args: ["--full-auto"]
-    timeout: 30m
-    capture: [stdout, stderr, exitCode]
-
 workflow:
   - type: agent
     name: write

@@ -21,12 +21,21 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(raw, cfg); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
 	}
+	baseAgents, err := loadBaseAgents(path)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.Version != 1 {
 		return nil, fmt.Errorf("unsupported config version: %d", cfg.Version)
 	}
 	if cfg.Agents == nil {
 		cfg.Agents = map[string]AgentConfig{}
 	}
+	mergedAgents, err := mergeAgents(baseAgents, cfg.Agents)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Agents = mergedAgents
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -88,6 +97,90 @@ func ValidateConfig(cfg *Config) error {
 		return err
 	}
 	return nil
+}
+
+func loadBaseAgents(configPath string) (map[string]AgentConfig, error) {
+	dir := ConfigDir(configPath)
+	if dir == "" {
+		dir = "."
+	}
+	agentsPath := filepath.Join(dir, "agents.yaml")
+	if _, err := os.Stat(agentsPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("agents.yaml not found: %s", agentsPath)
+		}
+		return nil, fmt.Errorf("stat agents.yaml: %w", err)
+	}
+	raw, err := os.ReadFile(agentsPath)
+	if err != nil {
+		return nil, fmt.Errorf("read agents.yaml: %w", err)
+	}
+	var payload struct {
+		Agents map[string]AgentConfig `yaml:"agents"`
+	}
+	if err := yaml.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("parse agents.yaml: %w", err)
+	}
+	if payload.Agents == nil {
+		payload.Agents = map[string]AgentConfig{}
+	}
+	return payload.Agents, nil
+}
+
+func mergeAgents(base, overrides map[string]AgentConfig) (map[string]AgentConfig, error) {
+	merged := map[string]AgentConfig{}
+	for name, agent := range base {
+		merged[name] = agent
+	}
+	for name, agent := range overrides {
+		baseAgent := AgentConfig{}
+		if agent.Extends != "" {
+			extended, ok := base[agent.Extends]
+			if !ok {
+				return nil, fmt.Errorf("agent %s extends unknown agent: %s", name, agent.Extends)
+			}
+			baseAgent = extended
+		} else if existing, ok := merged[name]; ok {
+			baseAgent = existing
+		}
+		merged[name] = mergeAgentConfig(baseAgent, agent)
+	}
+	return merged, nil
+}
+
+func mergeAgentConfig(base, override AgentConfig) AgentConfig {
+	result := base
+	if override.Type != "" {
+		result.Type = override.Type
+	}
+	if override.Command != "" {
+		result.Command = override.Command
+	}
+	if override.Args != nil {
+		result.Args = override.Args
+	}
+	if override.Env != nil {
+		if result.Env == nil {
+			result.Env = map[string]string{}
+		}
+		for key, value := range override.Env {
+			result.Env[key] = value
+		}
+	}
+	if override.Timeout != "" {
+		result.Timeout = override.Timeout
+	}
+	if override.Capture != nil {
+		result.Capture = override.Capture
+	}
+	if override.Print != nil {
+		result.Print = override.Print
+	}
+	if override.Session != nil {
+		result.Session = override.Session
+	}
+	result.Extends = ""
+	return result
 }
 
 func validateWorkflow(cfg *Config, items []WorkflowItem, seenNames map[string]bool) error {

@@ -159,6 +159,12 @@ func mergeAgentConfig(base, override AgentConfig) AgentConfig {
 	if override.Args != nil {
 		result.Args = override.Args
 	}
+	if override.OutputSchema != "" {
+		result.OutputSchema = override.OutputSchema
+	}
+	if override.OutputFile != "" {
+		result.OutputFile = override.OutputFile
+	}
 	if override.Env != nil {
 		if result.Env == nil {
 			result.Env = map[string]string{}

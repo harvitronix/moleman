@@ -101,6 +101,9 @@ func ensureAgentCommands(cfg *Config, workdir string) error {
 		if err := commandAvailable(command, workdir); err != nil {
 			return fmt.Errorf("agent %s command not found: %s (%w)", name, command, err)
 		}
+		if err := validateOutputSchema(agent.OutputSchema, workdir); err != nil {
+			return fmt.Errorf("agent %s output schema error: %w", name, err)
+		}
 	}
 	return nil
 }
@@ -151,6 +154,23 @@ func commandAvailable(command, workdir string) error {
 	}
 	_, err := exec.LookPath(command)
 	return err
+}
+
+func validateOutputSchema(schemaPath, workdir string) error {
+	if schemaPath == "" {
+		return nil
+	}
+	resolved, err := RenderTemplate(schemaPath, map[string]any{})
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(resolved) && workdir != "" {
+		resolved = filepath.Join(workdir, resolved)
+	}
+	if _, err := os.Stat(resolved); err != nil {
+		return err
+	}
+	return nil
 }
 
 func writeArtifactsSkeleton(runDir string, input string, workflow []WorkflowItem) error {

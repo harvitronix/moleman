@@ -3,6 +3,15 @@
 # Agent defaults live in ./agents.yaml.
 version: 1
 
+agents:
+  codex_review:
+    extends: codex
+    outputSchema: "schemas/review.json"
+
+  codex_rereview:
+    extends: codex
+    outputSchema: "schemas/review.json"
+
 workflow:
   - type: agent
     name: write
@@ -14,9 +23,9 @@ workflow:
 
   - type: agent
     name: review
-    agent: codex
+    agent: codex_review
     input:
-      prompt: "Review only the changes not yet committed (current git diff). Return must-fix issues. Original prompt: {{ .input.prompt }}"
+      prompt: "Review only the changes not yet committed (current git diff). Return JSON only. Original prompt: {{ .input.prompt }}"
     output:
       toNext: true
 
@@ -36,10 +45,10 @@ workflow:
 
       - type: agent
         name: rereview
-        agent: codex
+        agent: codex_rereview
         session:
           resume: last
         input:
-          prompt: "Re-review the current git diff. Context from last fix: {{ index .outputs \"fix\" }}"
+          prompt: "Re-review the current git diff. Return JSON only. Context from last fix: {{ index .outputs \"fix\" }}"
         output:
           toNext: true

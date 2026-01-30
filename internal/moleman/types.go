@@ -11,6 +11,8 @@ type AgentConfig struct {
 	Type    string            `yaml:"type"`
 	Command string            `yaml:"command,omitempty"`
 	Args    []string          `yaml:"args,omitempty"`
+	OutputSchema string       `yaml:"outputSchema,omitempty"`
+	OutputFile   string       `yaml:"outputFile,omitempty"`
 	Env     map[string]string `yaml:"env,omitempty"`
 	Timeout string            `yaml:"timeout,omitempty"`
 	Capture []string          `yaml:"capture,omitempty"`

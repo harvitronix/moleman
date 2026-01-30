@@ -54,8 +54,9 @@ of artifacts, a clear status, and another go at the workflow. If he can survive
 
 ## Requirements
 
-- Go 1.21+ (for `go install` / `go build`)
+- Go 1.22+ (for `go install` / `go build`)
 - A configured agent CLI (Codex, Claude, or any generic command)
+- Any required API keys or auth for your chosen agent CLI
 
 ## Install
 
@@ -80,7 +81,13 @@ go install ./...
 
 ## Quick Start
 
-1) Create a config file (minimal example). Agent defaults live in
+1) Scaffold a config (recommended):
+
+```
+./moleman init
+```
+
+Or create a config file manually (minimal example). Agent defaults live in
 `agents.yaml`, so you only need the workflow here:
 
 ```yaml
@@ -103,13 +110,19 @@ workflow:
 ./moleman run --prompt "Fix the lint errors in src/"
 ```
 
-3) Inspect artifacts:
+3) Validate your setup (optional but handy):
+
+```
+./moleman doctor
+```
+
+4) Inspect artifacts:
 
 ```
 ls .moleman/runs/
 ```
 
-4) If you keep configs outside the repo, pass `--config`:
+5) If you keep configs outside the repo, pass `--config`:
 
 ```
 ./moleman run --config ~/.moleman/configs/default.yaml --prompt "..."
@@ -120,6 +133,8 @@ Useful commands:
 - `moleman run` - execute the workflow
 - `moleman agents` - list configured agents
 - `moleman explain` - print the resolved workflow
+- `moleman init` - scaffold `moleman.yaml` (uses repo `agents.yaml`)
+- `moleman doctor` - validate config, agents, and environment
 
 ## Supported agents
 
@@ -147,6 +162,8 @@ Useful commands:
 
 ```
 moleman run --prompt "..." [--config path/to/moleman.yaml]
+moleman init [--config path/to/moleman.yaml] [--force]
+moleman doctor [--config path/to/moleman.yaml]
 moleman agents [--config ...]
 moleman explain [--config ...]
 moleman --version
@@ -169,6 +186,16 @@ make check
 ```
 
 ## Configuration
+
+### Recommended file layout
+
+```
+./moleman.yaml
+./agents.yaml
+.moleman/
+  runs/
+  configs/   # optional, personal configs ignored by git
+```
 
 ### Example Config (`moleman.yaml`)
 
@@ -206,6 +233,7 @@ agents:
   codex_review:
     extends: codex
     args: ["--full-auto"] # add model/thinking flags for your CLI here
+    outputSchema: "schemas/review.json"
 ```
 
 ### Example loop (write -> review -> write)
@@ -262,6 +290,8 @@ Agent config:
 - `type` (string, required: `codex`, `claude`, `generic`)
 - `command` (string, required for `generic`, optional otherwise)
 - `args` (list, optional)
+- `outputSchema` (string, optional; Codex JSON schema file)
+- `outputFile` (string, optional; writes last message to a file)
 - `env` (map, optional)
 - `timeout` (string duration, optional)
 - `capture` (list, optional: `stdout`, `stderr`, `exitCode`)
@@ -373,5 +403,5 @@ For a Codex + Claude review loop, check `examples/codex-claude-loop.yaml`.
 - No agents listed: make sure `moleman.yaml` exists or pass `--config`.
 - Agent command fails: verify the agent CLI is installed and on `PATH`.
 - Missing outputs: check `.moleman/runs/<timestamp>-workflow/nodes/<name>/`.
- - Weird template output: confirm you used the right data (`.input`, `.last`,
-   `.outputs`).
+- Weird template output: confirm you used the right data (`.input`, `.last`,
+  `.outputs`).

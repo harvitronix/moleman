@@ -40,13 +40,18 @@ func TestEvalConditionBasic(t *testing.T) {
 
 func TestEvalConditionErrors(t *testing.T) {
 	data := map[string]any{
-		"outputs": map[string]any{},
+		"outputs": map[string]any{
+			"bad": "zero",
+			"obj": map[string]any{
+				"value": "nope",
+			},
+		},
 	}
 
 	cases := []string{
 		"",
-		"outputs.missing.value == 0",
-		"outputs.bad == \"zero\"",
+		"outputs.bad == 1",
+		"outputs.obj == \"zero\"",
 	}
 
 	for _, expr := range cases {

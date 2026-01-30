@@ -152,6 +152,23 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 
 	session := effectiveSession(agent.Session, item.Session)
 	args := []string{}
+	templateData := ctx.TemplateData()
+	outputSchema := agent.OutputSchema
+	if outputSchema != "" {
+		resolved, err := RenderTemplate(outputSchema, templateData)
+		if err != nil {
+			return "", nil, err
+		}
+		outputSchema = resolved
+	}
+	outputFile := agent.OutputFile
+	if outputFile != "" {
+		resolved, err := RenderTemplate(outputFile, templateData)
+		if err != nil {
+			return "", nil, err
+		}
+		outputFile = resolved
+	}
 
 	switch agent.Type {
 	case "codex":
@@ -161,6 +178,12 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 			args = append(args, "exec")
 		}
 		args = append(args, agent.Args...)
+		if outputSchema != "" {
+			args = append(args, "--output-schema", outputSchema)
+		}
+		if outputFile != "" {
+			args = append(args, "--output-last-message", outputFile)
+		}
 		args = append(args, input)
 	case "claude":
 		args = append(args, "-p", input)

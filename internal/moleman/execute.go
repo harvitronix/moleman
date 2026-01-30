@@ -354,9 +354,10 @@ func handleOutput(ctx *RunContext, item WorkflowItem, stdout []byte) error {
 			ctx.Outputs[item.Name] = output
 		}
 		if parsed := parseJSONOutput(stdout); parsed != nil {
-			ctx.Outputs["__previous_json__"] = parsed
+			normalized := normalizeStructuredOutput(parsed)
+			ctx.Outputs["__previous_json__"] = normalized
 			if item.Name != "" {
-				ctx.Outputs[item.Name+"_json"] = parsed
+				ctx.Outputs[item.Name+"_json"] = normalized
 			}
 		}
 	}
@@ -401,6 +402,23 @@ func parseJSONOutput(stdout []byte) any {
 		return nil
 	}
 	return value
+}
+
+func normalizeStructuredOutput(value any) any {
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	if _, exists := obj["structured_output"]; exists {
+		return obj
+	}
+	normalized := map[string]any{
+		"structured_output": obj,
+	}
+	for key, val := range obj {
+		normalized[key] = val
+	}
+	return normalized
 }
 
 func outputAsString(value any) (string, error) {

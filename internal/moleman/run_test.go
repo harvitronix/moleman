@@ -11,17 +11,21 @@ func TestRunExecutesStepsAndWritesArtifacts(t *testing.T) {
 	configPath := filepath.Join(tempDir, "moleman.yaml")
 	config := `version: 1
 
-steps:
-  first:
-    type: run
-    run: "printf 'hello'"
+agents:
+  echo:
+    type: generic
+    command: "printf"
+    args: []
     capture: [stdout, stderr, exitCode]
 
-pipelines:
-  default:
-    plan:
-      - type: ref
-        id: first
+workflow:
+  - type: agent
+    name: first
+    agent: echo
+    input:
+      prompt: "hello"
+    output:
+      toNext: true
 `
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -32,7 +36,7 @@ pipelines:
 		t.Fatalf("load config: %v", err)
 	}
 
-	result, err := Run(cfg, configPath, RunOptions{Pipeline: "default"})
+	result, err := Run(cfg, configPath, RunOptions{})
 	if err != nil {
 		t.Fatalf("run failed: %v", err)
 	}
@@ -46,7 +50,7 @@ pipelines:
 		t.Fatalf("missing summary: %v", err)
 	}
 
-	metaPath := filepath.Join(result.RunDir, "steps", "first", "01", "meta.json")
+	metaPath := filepath.Join(result.RunDir, "nodes", "first", "meta.json")
 	if _, err := os.Stat(metaPath); err != nil {
 		t.Fatalf("missing step meta: %v", err)
 	}
@@ -57,21 +61,24 @@ func TestRunLoopStopsOnCondition(t *testing.T) {
 	configPath := filepath.Join(tempDir, "moleman.yaml")
 	config := `version: 1
 
-steps:
+agents:
   fail:
-    type: run
-    run: "exit 1"
+    type: generic
+    command: "false"
     capture: [stdout, stderr, exitCode]
 
-pipelines:
-  default:
-    plan:
-      - type: loop
-        maxIters: 2
-        until: "steps.fail.exitCode == 0"
-        body:
-          - type: ref
-            id: fail
+workflow:
+  - type: loop
+    maxIters: 2
+    until: "outputs.__previous__ == \"ok\""
+    body:
+      - type: agent
+        name: fail_once
+        agent: fail
+        input:
+          prompt: "ignored"
+        output:
+          toNext: true
 `
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -82,7 +89,7 @@ pipelines:
 		t.Fatalf("load config: %v", err)
 	}
 
-	if _, err := Run(cfg, configPath, RunOptions{Pipeline: "default"}); err == nil {
+	if _, err := Run(cfg, configPath, RunOptions{}); err == nil {
 		t.Fatalf("expected loop exhaustion error")
 	}
 }

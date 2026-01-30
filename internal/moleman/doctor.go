@@ -13,13 +13,15 @@ func Doctor(configPath string) error {
 	if err != nil {
 		return err
 	}
-	for name := range cfg.Pipelines {
-		if _, err := ResolvePlan(cfg, name); err != nil {
-			return fmt.Errorf("pipeline %s: %w", name, err)
-		}
+	if err := ValidateConfig(cfg); err != nil {
+		return err
 	}
-	if _, err := os.Stat("/bin/sh"); err != nil && os.Getenv("SHELL") == "" {
-		return fmt.Errorf("shell not found; set SHELL or ensure /bin/sh exists")
+	workdir := ConfigDir(configPath)
+	if workdir == "" {
+		workdir = "."
+	}
+	if err := ensureAgentCommands(cfg, workdir); err != nil {
+		return err
 	}
 	return nil
 }

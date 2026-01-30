@@ -16,128 +16,218 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-func executeNodes(ctx *RunContext, nodes []Node, inLoop bool) error {
-	for _, node := range nodes {
-		switch node.Type {
-		case "run":
-			if err := executeRunNode(ctx, node, inLoop); err != nil {
+func executeWorkflow(ctx *RunContext, cfg *Config, items []WorkflowItem) error {
+	for _, item := range items {
+		switch item.Type {
+		case "agent":
+			if err := executeAgentNode(ctx, cfg, item); err != nil {
 				return err
 			}
 		case "loop":
-			if err := executeLoop(ctx, node); err != nil {
+			if err := executeLoop(ctx, cfg, item); err != nil {
 				return err
 			}
 		default:
-			return fmt.Errorf("unexpected node type at execution: %s", node.Type)
+			return fmt.Errorf("unknown workflow type: %s", item.Type)
 		}
 	}
 	return nil
 }
 
-func executeLoop(ctx *RunContext, node Node) error {
-	for i := 0; i < node.MaxIters; i++ {
+func executeLoop(ctx *RunContext, cfg *Config, item WorkflowItem) error {
+	for i := 0; i < item.MaxIters; i++ {
 		if ctx.Verbose {
-			log.Debugf("loop iteration %d/%d", i+1, node.MaxIters)
+			log.Debugf("loop iteration %d/%d", i+1, item.MaxIters)
 		}
-		if err := executeNodes(ctx, node.Body, true); err != nil {
+		if err := executeWorkflow(ctx, cfg, item.Body); err != nil {
 			return err
 		}
-
-		data := ctx.TemplateData()
-		cond, err := EvalCondition(node.Until, data)
+		cond, err := EvalCondition(item.Until, ctx.TemplateData())
 		if err != nil {
 			return fmt.Errorf("loop condition: %w", err)
 		}
 		if cond {
-			log.Info("loop condition met", "iteration", i+1, "max", node.MaxIters)
+			log.Info("loop condition met", "iteration", i+1, "max", item.MaxIters)
 			return nil
 		}
 	}
 	return fmt.Errorf("loop exhausted without meeting condition")
 }
 
-func executeRunNode(ctx *RunContext, node Node, inLoop bool) error {
-	id := node.ID
-	if id == "" {
-		id = fmt.Sprintf("inline-%d", len(ctx.StepsHistory)+1)
+func executeAgentNode(ctx *RunContext, cfg *Config, item WorkflowItem) error {
+	agent, ok := cfg.Agents[item.Agent]
+	if !ok {
+		return fmt.Errorf("unknown agent: %s", item.Agent)
 	}
 
-	templated, err := renderRunNode(ctx, node)
+	input, err := resolveInput(ctx, item.Input)
 	if err != nil {
 		return err
 	}
 
-	iteration := len(ctx.StepsHistory[id]) + 1
-	log.Info("step start", "step", id, "iteration", fmt.Sprintf("%02d", iteration))
-
-	result, err := runCommand(ctx, id, templated)
+	command, args, err := buildAgentCommand(ctx, agent, item, input)
 	if err != nil {
 		return err
 	}
 
-	if result.ExitCode != 0 && !inLoop {
-		return fmt.Errorf("step failed: %s (exit %d)", id, result.ExitCode)
+	stepDir, err := nodeRunDir(ctx.RunDir, item.Name)
+	if err != nil {
+		return err
 	}
+
+	stdoutBuf, _, exitCode, duration, err := runCommand(ctx, item.Name, item.Agent, command, args, agent, stepDir, input)
+	if err != nil {
+		return err
+	}
+
+	if err := handleOutput(ctx, item, stdoutBuf.Bytes()); err != nil {
+		return err
+	}
+
+	if agent.Type == "claude" {
+		updateClaudeSession(ctx, stdoutBuf.Bytes())
+	}
+
+	ctx.NodeResults = append(ctx.NodeResults, NodeResult{
+		Name:     item.Name,
+		Agent:    item.Agent,
+		ExitCode: exitCode,
+		Duration: duration,
+		Command:  strings.Join(append([]string{command}, args...), " "),
+	})
+
+	if exitCode != 0 {
+		return fmt.Errorf("node failed: %s (exit %d)", item.Name, exitCode)
+	}
+
+	log.Info("node done", "name", item.Name, "agent", item.Agent, "exit", exitCode, "duration", duration)
 	return nil
 }
 
-func renderRunNode(ctx *RunContext, node Node) (Node, error) {
+func resolveInput(ctx *RunContext, input InputSpec) (string, error) {
 	data := ctx.TemplateData()
-	out := node
-	var err error
-
-	out.Run, err = RenderTemplate(node.Run, data)
-	if err != nil {
-		return node, err
+	if input.Prompt != "" {
+		return RenderTemplate(input.Prompt, data)
 	}
-	out.Stdin, err = RenderTemplate(node.Stdin, data)
-	if err != nil {
-		return node, err
+	if input.File != "" {
+		path, err := RenderTemplate(input.File, data)
+		if err != nil {
+			return "", err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return "", fmt.Errorf("read input file: %w", err)
+		}
+		return string(raw), nil
 	}
-	out.StdinFile, err = RenderTemplate(node.StdinFile, data)
-	if err != nil {
-		return node, err
-	}
-	out.Until, err = RenderTemplate(node.Until, data)
-	if err != nil {
-		return node, err
-	}
-
-	if node.Env != nil {
-		out.Env = map[string]string{}
-		for key, value := range node.Env {
-			rendered, err := RenderTemplate(value, data)
-			if err != nil {
-				return node, err
+	if input.From != "" {
+		switch input.From {
+		case "previous", "prev":
+			return outputAsString(ctx.Outputs["__previous__"])
+		case "input":
+			return ctx.Input, nil
+		default:
+			value, ok := ctx.Outputs[input.From]
+			if !ok {
+				return "", fmt.Errorf("input from unknown node: %s", input.From)
 			}
-			out.Env[key] = rendered
+			return outputAsString(value)
 		}
 	}
-
-	return out, nil
+	return "", fmt.Errorf("input is empty")
 }
 
-func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
-	if node.Run == "" {
-		return StepResult{}, fmt.Errorf("run node missing command")
-	}
-	if node.Stdin != "" && node.StdinFile != "" {
-		return StepResult{}, fmt.Errorf("step %s: both stdin and stdinFile provided", id)
-	}
-
-	shell := node.Shell
-	if shell == "" {
-		shell = os.Getenv("SHELL")
-		if shell == "" {
-			shell = "/bin/sh"
+func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, input string) (string, []string, error) {
+	command := agent.Command
+	if command == "" {
+		switch agent.Type {
+		case "codex":
+			command = "codex"
+		case "claude":
+			command = "claude"
+		default:
+			return "", nil, fmt.Errorf("unsupported agent type: %s", agent.Type)
 		}
 	}
 
-	var timeout time.Duration
-	if node.Timeout != "" {
-		parsed, err := time.ParseDuration(node.Timeout)
+	session := effectiveSession(agent.Session, item.Session)
+	args := []string{}
+	templateData := ctx.TemplateData()
+	outputSchema := agent.OutputSchema
+	if outputSchema != "" {
+		resolved, err := RenderTemplate(outputSchema, templateData)
 		if err != nil {
-			return StepResult{}, fmt.Errorf("step %s timeout: %w", id, err)
+			return "", nil, err
+		}
+		outputSchema = resolved
+	}
+	outputFile := agent.OutputFile
+	if outputFile != "" {
+		resolved, err := RenderTemplate(outputFile, templateData)
+		if err != nil {
+			return "", nil, err
+		}
+		outputFile = resolved
+	}
+
+	switch agent.Type {
+	case "codex":
+		if session.Resume == "last" {
+			args = append(args, "exec", "resume", "--last")
+		} else {
+			args = append(args, "exec")
+		}
+		args = append(args, agent.Args...)
+		if outputSchema != "" {
+			args = append(args, "--output-schema", outputSchema)
+		}
+		if outputFile != "" {
+			args = append(args, "--output-last-message", outputFile)
+		}
+		args = append(args, input)
+	case "claude":
+		args = append(args, "-p", input)
+		args = append(args, agent.Args...)
+		if session.Resume == "last" {
+			sessionID := ctx.Sessions["claude"]
+			if sessionID == "" {
+				return "", nil, fmt.Errorf("claude resume requested but no session_id is available")
+			}
+			args = append(args, "--resume", sessionID)
+		}
+	case "generic":
+		if command == "" {
+			return "", nil, fmt.Errorf("generic agent requires command")
+		}
+		args = append(args, agent.Args...)
+		if input != "" {
+			args = append(args, input)
+		}
+	default:
+		return "", nil, fmt.Errorf("unsupported agent type: %s", agent.Type)
+	}
+
+	return command, args, nil
+}
+
+func effectiveSession(agentSession *SessionSpec, nodeSession SessionSpec) SessionSpec {
+	if nodeSession.Resume != "" {
+		return nodeSession
+	}
+	if agentSession != nil {
+		return *agentSession
+	}
+	return SessionSpec{Resume: "new"}
+}
+
+func runCommand(ctx *RunContext, nodeName, agentName, command string, args []string, agent AgentConfig, stepDir string, input string) (*bytes.Buffer, *bytes.Buffer, int, string, error) {
+	log.Info("node start", "command", command, "args", strings.Join(args, " "))
+
+	var timeout time.Duration
+	if agent.Timeout != "" {
+		parsed, err := time.ParseDuration(agent.Timeout)
+		if err != nil {
+			return nil, nil, 1, "", fmt.Errorf("timeout: %w", err)
 		}
 		timeout = parsed
 	}
@@ -149,55 +239,49 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctxExec, shell, "-c", node.Run)
+	cmd := exec.CommandContext(ctxExec, command, args...)
 	cmd.Dir = ctx.Workdir
-	cmd.Env = buildEnv(node.Env)
+	cmd.Env = buildEnv(agent.Env)
 
-	stdin, err := resolveStdin(node.Stdin, node.StdinFile)
-	if err != nil {
-		return StepResult{}, err
-	}
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
-
-	stepDir, err := stepRunDir(ctx.RunDir, id, len(ctx.StepsHistory[id])+1)
-	if err != nil {
-		return StepResult{}, err
+	if input != "" && agent.Type == "claude" && !strings.Contains(strings.Join(args, " "), "-p") {
+		cmd.Stdin = strings.NewReader(input)
 	}
 
 	stdoutPath := filepath.Join(stepDir, "stdout.log")
 	stderrPath := filepath.Join(stepDir, "stderr.log")
 	stdoutFile, err := os.Create(stdoutPath)
 	if err != nil {
-		return StepResult{}, fmt.Errorf("create stdout log: %w", err)
+		return nil, nil, 1, "", fmt.Errorf("create stdout log: %w", err)
 	}
 	defer stdoutFile.Close()
 	stderrFile, err := os.Create(stderrPath)
 	if err != nil {
-		return StepResult{}, fmt.Errorf("create stderr log: %w", err)
+		return nil, nil, 1, "", fmt.Errorf("create stderr log: %w", err)
 	}
 	defer stderrFile.Close()
 
-	captureStdout := shouldCapture(node.Capture, "stdout")
-	captureStderr := shouldCapture(node.Capture, "stderr")
-	printStdout := shouldPrint(node.Print, "stdout")
-	printStderr := shouldPrint(node.Print, "stderr")
+	captureStdout := shouldCapture(agent.Capture, "stdout")
+	captureStderr := shouldCapture(agent.Capture, "stderr")
+	printStdout := shouldPrint(agent.Print, "stdout")
+	printStderr := shouldPrint(agent.Print, "stderr")
 
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer
-
 	stdoutTracker := &outputTracker{}
 	stderrTracker := &outputTracker{}
+
 	cmd.Stdout = writerFor(stdoutFile, &stdoutBuf, captureStdout, pickWriter(printStdout, os.Stdout), stdoutTracker)
 	cmd.Stderr = writerFor(stderrFile, &stderrBuf, captureStderr, pickWriter(printStderr, os.Stderr), stderrTracker)
 
 	start := time.Now()
 	runErr := cmd.Run()
-	duration := time.Since(start)
+	duration := time.Since(start).String()
 
 	exitCode := 0
 	if runErr != nil {
+		if errors.Is(runErr, exec.ErrNotFound) {
+			return &stdoutBuf, &stderrBuf, 127, duration, fmt.Errorf("command not found: %s", command)
+		}
 		exitCode = exitCodeFromErr(runErr)
 	}
 
@@ -205,48 +289,127 @@ func runCommand(ctx *RunContext, id string, node Node) (StepResult, error) {
 		exitCode = 124
 	}
 
-	if printStdout && stdoutTracker.wrote && stdoutTracker.lastByte != '\n' {
-		fmt.Fprintln(os.Stdout)
+	if printStdout && stdoutTracker.wrote {
+		ensureTrailingNewline(os.Stdout, stdoutTracker)
 	}
-	if printStderr && stderrTracker.wrote && stderrTracker.lastByte != '\n' {
-		fmt.Fprintln(os.Stderr)
+	if printStderr && stderrTracker.wrote {
+		ensureTrailingNewline(os.Stderr, stderrTracker)
 	}
 
-	result := StepResult{
-		Stdout:   stdoutBuf.String(),
-		Stderr:   stderrBuf.String(),
+	meta := NodeResult{
+		Name:     nodeName,
+		Agent:    agentName,
 		ExitCode: exitCode,
-		Duration: duration.String(),
-		Command:  node.Run,
+		Duration: duration,
+		Command:  strings.Join(append([]string{command}, args...), " "),
+	}
+	if err := writeMeta(stepDir, meta, stdoutPath, stderrPath); err != nil {
+		return &stdoutBuf, &stderrBuf, exitCode, duration, err
 	}
 
-	ctx.Steps[id] = result
-	ctx.StepsHistory[id] = append(ctx.StepsHistory[id], result)
-	ctx.StepOrder = append(ctx.StepOrder, StepExecution{ID: id, Iteration: len(ctx.StepsHistory[id])})
-
-	if err := writeMeta(stepDir, result); err != nil {
-		return result, err
-	}
-	if node.Parse != nil && node.Parse.Kind == "json" {
-		if err := parseJSONInto(ctx, node.Parse.Into, stdoutBuf.Bytes(), stdoutPath); err != nil {
-			return result, err
-		}
-	}
-
-	log.Info("step done", "step", id, "iteration", fmt.Sprintf("%02d", len(ctx.StepsHistory[id])), "exit", exitCode, "duration", duration.String())
-
-	return result, nil
+	return &stdoutBuf, &stderrBuf, exitCode, duration, nil
 }
 
-func resolveStdin(stdin, stdinFile string) (string, error) {
-	if stdinFile == "" {
-		return stdin, nil
+func handleOutput(ctx *RunContext, item WorkflowItem, stdout []byte) error {
+	output := string(stdout)
+	if item.Output.ToNext {
+		ctx.LastOutput = output
+		ctx.Outputs["__previous__"] = output
+		if item.Name != "" {
+			ctx.Outputs[item.Name] = output
+		}
+		if parsed := parseJSONOutput(stdout); parsed != nil {
+			ctx.Outputs["__previous_json__"] = parsed
+			if item.Name != "" {
+				ctx.Outputs[item.Name+"_json"] = parsed
+			}
+		}
 	}
-	raw, err := os.ReadFile(stdinFile)
+	if item.Output.File != "" {
+		path, err := RenderTemplate(item.Output.File, ctx.TemplateData())
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, stdout, 0o644); err != nil {
+			return fmt.Errorf("write output file: %w", err)
+		}
+	}
+	if item.Output.Stdout {
+		if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+			return err
+		}
+		if _, err := os.Stdout.Write(stdout); err != nil {
+			return err
+		}
+		if len(stdout) > 0 && stdout[len(stdout)-1] != '\n' {
+			_, _ = os.Stdout.Write([]byte("\n"))
+		}
+	}
+	return nil
+}
+
+func updateClaudeSession(ctx *RunContext, stdout []byte) {
+	var payload struct {
+		SessionID string `json:"session_id"`
+	}
+	if err := json.Unmarshal(stdout, &payload); err != nil {
+		return
+	}
+	if payload.SessionID != "" {
+		ctx.Sessions["claude"] = payload.SessionID
+	}
+}
+
+func parseJSONOutput(stdout []byte) any {
+	var value any
+	if err := json.Unmarshal(stdout, &value); err != nil {
+		return nil
+	}
+	return value
+}
+
+func outputAsString(value any) (string, error) {
+	switch v := value.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return v, nil
+	case []byte:
+		return string(v), nil
+	default:
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("marshal output: %w", err)
+		}
+		return string(raw), nil
+	}
+}
+
+func nodeRunDir(runDir, name string) (string, error) {
+	if name == "" {
+		name = "node"
+	}
+	dir := filepath.Join(runDir, "nodes", name)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create node dir: %w", err)
+	}
+	return dir, nil
+}
+
+func writeMeta(stepDir string, meta NodeResult, stdoutPath, stderrPath string) error {
+	raw, err := json.MarshalIndent(struct {
+		NodeResult
+		StdoutLog string `json:"stdoutLog"`
+		StderrLog string `json:"stderrLog"`
+	}{
+		NodeResult: meta,
+		StdoutLog:  stdoutPath,
+		StderrLog:  stderrPath,
+	}, "", "  ")
 	if err != nil {
-		return "", fmt.Errorf("read stdin file: %w", err)
+		return fmt.Errorf("marshal meta: %w", err)
 	}
-	return string(raw), nil
+	return os.WriteFile(filepath.Join(stepDir, "meta.json"), raw, 0o644)
 }
 
 func writerFor(file *os.File, buf *bytes.Buffer, capture bool, printTo io.Writer, tracker *outputTracker) io.Writer {
@@ -329,39 +492,10 @@ func (t *outputTracker) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func stepRunDir(runDir, id string, iteration int) (string, error) {
-	dir := filepath.Join(runDir, "steps", id, fmt.Sprintf("%02d", iteration))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("create step dir: %w", err)
+func ensureTrailingNewline(writer io.Writer, tracker *outputTracker) {
+	if tracker.lastByte != '\n' {
+		fmt.Fprintln(writer)
 	}
-	return dir, nil
-}
-
-func writeMeta(stepDir string, result StepResult) error {
-	raw, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal meta: %w", err)
-	}
-	return os.WriteFile(filepath.Join(stepDir, "meta.json"), raw, 0o644)
-}
-
-func parseJSONInto(ctx *RunContext, key string, stdout []byte, stdoutPath string) error {
-	if key == "" {
-		return fmt.Errorf("parse config missing 'into'")
-	}
-	if len(stdout) == 0 {
-		loaded, err := os.ReadFile(stdoutPath)
-		if err != nil {
-			return fmt.Errorf("read stdout: %w", err)
-		}
-		stdout = loaded
-	}
-	var value any
-	if err := json.Unmarshal(stdout, &value); err != nil {
-		return fmt.Errorf("parse json: %w", err)
-	}
-	ctx.Vars[key] = value
-	return nil
 }
 
 func buildEnv(extra map[string]string) []string {

@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "must_fix_count": {
+      "type": "integer"
+    },
+    "must_fix_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": ["must_fix_count", "must_fix_items"],
+  "additionalProperties": false
+}

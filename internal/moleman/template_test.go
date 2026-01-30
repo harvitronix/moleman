@@ -7,14 +7,16 @@ func TestRenderTemplate(t *testing.T) {
 		"input": map[string]any{
 			"prompt": "hello",
 		},
-		"steps": map[string]any{
-			"lint": map[string]any{
-				"exitCode": 0,
+		"outputs": map[string]any{
+			"review_json": map[string]any{
+				"structured_output": map[string]any{
+					"must_fix_count": 0,
+				},
 			},
 		},
 	}
 
-	out, err := RenderTemplate("{{ .input.prompt }} {{ .steps.lint.exitCode }}", data)
+	out, err := RenderTemplate("{{ .input.prompt }} {{ .outputs.review_json.structured_output.must_fix_count }}", data)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -1,6 +1,7 @@
 package moleman
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -8,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+var errMissingValue = errors.New("missing value")
 
 func EvalCondition(expr string, data map[string]any) (bool, error) {
 	expr = strings.TrimSpace(expr)
@@ -24,6 +27,9 @@ func EvalCondition(expr string, data map[string]any) (bool, error) {
 	}
 	value, err := evalExpr(node, data)
 	if err != nil {
+		if errors.Is(err, errMissingValue) {
+			return false, nil
+		}
 		return false, err
 	}
 	b, ok := value.(bool)
@@ -231,17 +237,20 @@ func coerceFloat(value any) (float64, bool) {
 func lookupPath(root map[string]any, path string) (any, error) {
 	value, ok := root[path]
 	if !ok {
-		return nil, fmt.Errorf("unknown identifier: %s", path)
+		return nil, fmt.Errorf("%w: %s", errMissingValue, path)
 	}
 	return value, nil
 }
 
 func lookupSelector(base any, key string) (any, error) {
+	if base == nil {
+		return nil, fmt.Errorf("%w: %s", errMissingValue, key)
+	}
 	switch v := base.(type) {
 	case map[string]any:
 		value, ok := v[key]
 		if !ok {
-			return nil, fmt.Errorf("missing key: %s", key)
+			return nil, fmt.Errorf("%w: %s", errMissingValue, key)
 		}
 		return value, nil
 	default:

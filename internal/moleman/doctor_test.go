@@ -18,11 +18,8 @@ func TestDoctorAnnotatesPipelineErrors(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "moleman.yaml")
 	config := `version: 1
-pipelines:
-  default:
-    plan:
-      - type: ref
-        id: missing
+agents: {}
+workflow: []
 `
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -30,9 +27,9 @@ pipelines:
 
 	err := Doctor(configPath)
 	if err == nil {
-		t.Fatalf("expected pipeline error")
+		t.Fatalf("expected validation error")
 	}
-	if !strings.Contains(err.Error(), "pipeline default") {
-		t.Fatalf("expected pipeline name in error, got %v", err)
+	if !strings.Contains(err.Error(), "agents map is empty") {
+		t.Fatalf("expected agents validation error, got %v", err)
 	}
 }

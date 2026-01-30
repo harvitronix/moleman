@@ -1,0 +1,18 @@
+agents:
+  codex:
+    type: codex
+    args: ["--full-auto"]
+    timeout: 45m
+    capture: [stdout, stderr, exitCode]
+
+  claude:
+    type: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - '{"type":"object","properties":{"must_fix_count":{"type":"integer"},"must_fix_items":{"type":"array","items":{"type":"string"}},"notes":{"type":"string"}},"required":["must_fix_count","must_fix_items"],"additionalProperties":false}'
+      - "--allowedTools"
+      - "Bash(git diff *),Bash(git status *),Read"
+    timeout: 30m
+    capture: [stdout, stderr, exitCode]

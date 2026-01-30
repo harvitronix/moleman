@@ -1,33 +1,10 @@
 version: 1
 
-steps:
-  code:
-    type: run
-    run: "ai-code --non-interactive --prompt {{ shellEscape (printf \"%s\\n\\nDo not offer next steps or additional tasks; just return the requested output.\" .input.prompt) }} --context {{ shellEscape .git.diff }}"
-    timeout: 30m
-    capture: [stdout, stderr, exitCode]
-
-  lint:
-    type: run
-    run: "pnpm lint"
-    timeout: 10m
-
-  test:
-    type: run
-    run: "pnpm test"
-    timeout: 20m
-
-groups:
-  core:
-    - type: ref
-      id: code
-    - type: ref
-      id: lint
-    - type: ref
-      id: test
-
-pipelines:
-  default:
-    plan:
-      - type: ref
-        id: core
+workflow:
+  - type: agent
+    name: write
+    agent: codex
+    input:
+      from: input
+    output:
+      stdout: true

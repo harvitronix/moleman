@@ -1,56 +1,46 @@
 version: 1
 
-# Example: Codex writes, Claude reviews, Codex fixes, Claude re-reviews.
-# Notes:
-# - Claude's /review-self is interactive-only; in non-interactive mode we use -p
-#   and a review prompt instead.
-# - Claude runs with --output-format json so we can capture session_id and
-#   structured_output for loop control.
-# - Codex fixes are applied in the SAME session via `codex exec resume --last`.
+# Codex writes, Claude reviews, Codex fixes (same session), Claude re-reviews.
+# Claude runs in non-interactive mode via `-p` and uses JSON output so we can
+# capture session_id + structured_output for loop control.
 
-steps:
-  codex_write:
-    type: run
-    run: "codex exec --full-auto {{ shellEscape .input.prompt }}"
-    timeout: 45m
-    capture: [stdout, stderr, exitCode]
+workflow:
+  - type: agent
+    name: write
+    agent: codex
+    input:
+      from: input
+    output:
+      toNext: true
 
-  claude_review:
-    type: run
-    run: "claude -p {{ shellEscape (printf \"Review only the changes not yet committed (current git diff). Return must-fix issues as structured_output.\\n\\nOriginal prompt:\\n%s\" .input.prompt) }} --output-format json --json-schema '{\"type\":\"object\",\"properties\":{\"must_fix_count\":{\"type\":\"integer\"},\"must_fix_items\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"notes\":{\"type\":\"string\"}},\"required\":[\"must_fix_count\",\"must_fix_items\"],\"additionalProperties\":false}' --allowedTools \"Bash(git diff *),Bash(git status *),Read\""
-    parse:
-      kind: json
-      into: claude_review
-    timeout: 30m
-    capture: [stdout, stderr, exitCode]
+  - type: agent
+    name: review
+    agent: claude
+    input:
+      prompt: "Review the current git diff and list must-fix issues. Original prompt: {{ .input.prompt }}"
+    output:
+      toNext: true
 
-  codex_fix:
-    type: run
-    run: "codex exec resume --last --full-auto {{ shellEscape (printf \"Apply the review feedback below. If anything is not fixed, explain why.\\n\\n%s\" .vars.claude_review.result) }}"
-    timeout: 45m
-    capture: [stdout, stderr, exitCode]
+  - type: loop
+    maxIters: 5
+    until: "outputs.rereview_json.structured_output.must_fix_count == 0"
+    body:
+      - type: agent
+        name: fix
+        agent: codex
+        session:
+          resume: last
+        input:
+          from: review
+        output:
+          toNext: true
 
-  claude_rereview:
-    type: run
-    run: "claude -p {{ shellEscape (printf \"Re-review the current git diff. If issues remain, list must-fix items. Context from last fix attempt:\\n%s\" .steps.codex_fix.stdout) }} --output-format json --json-schema '{\"type\":\"object\",\"properties\":{\"must_fix_count\":{\"type\":\"integer\"},\"must_fix_items\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"notes\":{\"type\":\"string\"}},\"required\":[\"must_fix_count\",\"must_fix_items\"],\"additionalProperties\":false}' --resume {{ shellEscape .vars.claude_review.session_id }} --allowedTools \"Bash(git diff *),Bash(git status *),Read\""
-    parse:
-      kind: json
-      into: claude_rereview
-    timeout: 30m
-    capture: [stdout, stderr, exitCode]
-
-pipelines:
-  codex-claude-loop:
-    plan:
-      - type: ref
-        id: codex_write
-      - type: ref
-        id: claude_review
-      - type: loop
-        maxIters: 2
-        until: "vars.claude_rereview.structured_output.must_fix_count == 0"
-        body:
-          - type: ref
-            id: codex_fix
-          - type: ref
-            id: claude_rereview
+      - type: agent
+        name: rereview
+        agent: claude
+        session:
+          resume: last
+        input:
+          prompt: "Re-review the current git diff. Context from last fix: {{ index .outputs \"fix\" }}"
+        output:
+          toNext: true

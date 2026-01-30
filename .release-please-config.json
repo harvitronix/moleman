@@ -1,0 +1,15 @@
+{
+  "release-type": "go",
+  "packages": {
+    ".": {
+      "release-type": "go",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "version.go"
+        }
+      ]
+    }
+  }
+}

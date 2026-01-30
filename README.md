@@ -5,6 +5,8 @@ workflows. It executes a YAML workflow of agent nodes, moves data between
 agents, and writes artifacts per run for review and auditing.
 
 > Status: early prototype. Expect breaking config and CLI changes.
+> Note: moleman is not a coding agent. It only invokes already-installed
+> agent CLIs and does not handle sign-in or auth for them.
 
 ## Contents
 
@@ -56,6 +58,7 @@ of artifacts, a clear status, and another go at the workflow. If he can survive
 
 - Go 1.22+ (for `go install` / `go build`)
 - A configured agent CLI (Codex, Claude, or any generic command)
+- Install and sign in to your agent CLI first; moleman only invokes it
 - Any required API keys or auth for your chosen agent CLI
 
 ## Install

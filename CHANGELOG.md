@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Expand README with init/doctor usage, layout guidance, and onboarding tweaks.
+- Clarify in README that moleman invokes pre-installed agent CLIs and does not handle auth.
 - Fix `moleman init` default config to use a single output.
 - `moleman init` now writes a default `agents.yaml` so a new config runs without extra setup.
 

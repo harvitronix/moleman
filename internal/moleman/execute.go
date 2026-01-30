@@ -178,7 +178,12 @@ func buildAgentCommand(ctx *RunContext, agent AgentConfig, item WorkflowItem, in
 
 	switch agent.Type {
 	case "codex":
-		if session.Resume == "last" {
+		resumeLast := session.Resume == "last"
+		if resumeLast && (outputSchema != "" || outputFile != "") {
+			log.Warn("codex resume disabled for output schema/file", "node", item.Name, "agent", item.Agent)
+			resumeLast = false
+		}
+		if resumeLast {
 			args = append(args, "exec", "resume", "--last")
 		} else {
 			args = append(args, "exec")
@@ -290,6 +295,10 @@ func runCommand(ctx *RunContext, nodeName, agentName, command string, args []str
 	captureStderr := shouldCapture(agent.Capture, "stderr")
 	printStdout := shouldPrint(agent.Print, "stdout")
 	printStderr := shouldPrint(agent.Print, "stderr")
+	if ctx.Verbose {
+		printStdout = true
+		printStderr = true
+	}
 
 	var stdoutBuf bytes.Buffer
 	var stderrBuf bytes.Buffer

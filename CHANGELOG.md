@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Disable Codex resume when output schema/file is used.
+- Stream agent stdout/stderr when `--verbose` is enabled.
 - Fix review schema required fields and show stderr in node failures.
 
 ## 0.1.1

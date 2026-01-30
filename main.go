@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/muesli/termenv"
+	"github.com/urfave/cli/v2"
 	"moleman/internal/moleman"
 )
 
@@ -16,150 +16,187 @@ func main() {
 	configureLogging()
 	log.SetLevel(log.InfoLevel)
 
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(2)
+	app := &cli.App{
+		Name:                 "moleman",
+		Usage:                "agent-assisted workflow runner",
+		Version:              Version,
+		EnableBashCompletion: true,
+		Flags: []cli.Flag{
+			&cli.BoolFlag{Name: "version", Aliases: []string{"v"}, Usage: "print version"},
+		},
+		Action: func(c *cli.Context) error {
+			if c.Bool("version") {
+				fmt.Println(Version)
+				return nil
+			}
+			return cli.ShowAppHelp(c)
+		},
+		Commands: []*cli.Command{
+			runCommand(),
+			pipelinesCommand(),
+			explainCommand(),
+			initCommand(),
+			doctorCommand(),
+			versionCommand(),
+		},
 	}
 
-	switch os.Args[1] {
-	case "run":
-		runCmd(os.Args[2:])
-	case "pipelines":
-		pipelinesCmd(os.Args[2:])
-	case "explain":
-		explainCmd(os.Args[2:])
-	case "init":
-		initCmd(os.Args[2:])
-	case "doctor":
-		doctorCmd(os.Args[2:])
-	case "-h", "--help", "help":
-		usage()
-	default:
-		log.Error("unknown command", "command", os.Args[1])
-		usage()
-		os.Exit(2)
-	}
-}
-
-func usage() {
-	fmt.Print(`moleman - agent-assisted workflow runner
-
-Usage:
-  moleman run [flags]
-  moleman pipelines [flags]
-  moleman explain --pipeline <name> [flags]
-  moleman init [flags]
-  moleman doctor [flags]
-`)
-}
-
-func runCmd(args []string) {
-	fs := flag.NewFlagSet("run", flag.ExitOnError)
-	pipeline := fs.String("pipeline", "default", "pipeline name")
-	prompt := fs.String("prompt", "", "prompt text")
-	promptFile := fs.String("prompt-file", "", "prompt file path")
-	workdir := fs.String("workdir", "", "working directory")
-	configPath := fs.String("config", "", "config file path")
-	dryRun := fs.Bool("dry-run", false, "resolve and plan without executing")
-	verbose := fs.Bool("verbose", false, "verbose logging")
-	fs.Parse(args)
-
-	if *verbose {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	cfgPath := resolveConfigPath(*configPath, *workdir)
-	cfg, err := moleman.LoadConfig(cfgPath)
-	if err != nil {
-		exitErr(err)
-	}
-
-	runOpts := moleman.RunOptions{
-		Pipeline:   *pipeline,
-		Prompt:     *prompt,
-		PromptFile: *promptFile,
-		Workdir:    *workdir,
-		DryRun:     *dryRun,
-		Verbose:    *verbose,
-	}
-
-	result, err := moleman.Run(cfg, cfgPath, runOpts)
-	if err != nil {
-		if result != nil && result.RunDir != "" {
-			log.Warn("run artifacts", "path", result.RunDir)
-		}
-		exitErr(err)
-	}
-
-	log.Info("run succeeded", "path", result.RunDir)
-}
-
-func pipelinesCmd(args []string) {
-	fs := flag.NewFlagSet("pipelines", flag.ExitOnError)
-	configPath := fs.String("config", "", "config file path")
-	workdir := fs.String("workdir", "", "working directory")
-	fs.Parse(args)
-
-	cfgPath := resolveConfigPath(*configPath, *workdir)
-	cfg, err := moleman.LoadConfig(cfgPath)
-	if err != nil {
-		exitErr(err)
-	}
-
-	names := moleman.PipelineNames(cfg)
-	for _, name := range names {
-		fmt.Println(name)
+	if err := app.Run(os.Args); err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
 	}
 }
 
-func explainCmd(args []string) {
-	fs := flag.NewFlagSet("explain", flag.ExitOnError)
-	pipeline := fs.String("pipeline", "default", "pipeline name")
-	configPath := fs.String("config", "", "config file path")
-	workdir := fs.String("workdir", "", "working directory")
-	fs.Parse(args)
+func runCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "run",
+		Usage:     "Execute a pipeline",
+		UsageText: "moleman run [flags]\n\nExamples:\n  moleman run --pipeline default --prompt \"Fix the lint errors\"\n  moleman run --config ./moleman.yaml --prompt-file ./prompt.md",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "pipeline", Value: "default", Usage: "pipeline name"},
+			&cli.StringFlag{Name: "prompt", Usage: "prompt text"},
+			&cli.StringFlag{Name: "prompt-file", Usage: "prompt file path"},
+			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
+			&cli.StringFlag{Name: "config", Usage: "config file path"},
+			&cli.BoolFlag{Name: "dry-run", Usage: "resolve and plan without executing"},
+			&cli.BoolFlag{Name: "verbose", Usage: "verbose logging"},
+		},
+		Action: func(c *cli.Context) error {
+			if c.Bool("verbose") {
+				log.SetLevel(log.DebugLevel)
+			}
 
-	cfgPath := resolveConfigPath(*configPath, *workdir)
-	cfg, err := moleman.LoadConfig(cfgPath)
-	if err != nil {
-		exitErr(err)
-	}
+			cfgPath := resolveConfigPath(c.String("config"), c.String("workdir"))
+			cfg, err := moleman.LoadConfig(cfgPath)
+			if err != nil {
+				return err
+			}
 
-	plan, err := moleman.ResolvePlan(cfg, *pipeline)
-	if err != nil {
-		exitErr(err)
-	}
+			runOpts := moleman.RunOptions{
+				Pipeline:   c.String("pipeline"),
+				Prompt:     c.String("prompt"),
+				PromptFile: c.String("prompt-file"),
+				Workdir:    c.String("workdir"),
+				DryRun:     c.Bool("dry-run"),
+				Verbose:    c.Bool("verbose"),
+			}
 
-	if err := moleman.PrintPlan(plan); err != nil {
-		exitErr(err)
+			result, err := moleman.Run(cfg, cfgPath, runOpts)
+			if err != nil {
+				if result != nil && result.RunDir != "" {
+					log.Warn("run artifacts", "path", result.RunDir)
+				}
+				return err
+			}
+
+			log.Info("run succeeded", "path", result.RunDir)
+			return nil
+		},
 	}
 }
 
-func initCmd(args []string) {
-	fs := flag.NewFlagSet("init", flag.ExitOnError)
-	workdir := fs.String("workdir", "", "working directory")
-	force := fs.Bool("force", false, "overwrite existing config")
-	configPath := fs.String("config", "", "config file path")
-	fs.Parse(args)
+func pipelinesCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "pipelines",
+		Usage:     "List pipelines in the config",
+		UsageText: "moleman pipelines [flags]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "config", Usage: "config file path"},
+			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
+		},
+		Action: func(c *cli.Context) error {
+			cfgPath := resolveConfigPath(c.String("config"), c.String("workdir"))
+			cfg, err := moleman.LoadConfig(cfgPath)
+			if err != nil {
+				return err
+			}
 
-	cfgPath := resolveConfigPath(*configPath, *workdir)
-	if err := moleman.Init(cfgPath, *force); err != nil {
-		exitErr(err)
+			for _, name := range moleman.PipelineNames(cfg) {
+				fmt.Println(name)
+			}
+			return nil
+		},
 	}
-	log.Info("created", "path", cfgPath)
 }
 
-func doctorCmd(args []string) {
-	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
-	workdir := fs.String("workdir", "", "working directory")
-	configPath := fs.String("config", "", "config file path")
-	fs.Parse(args)
+func explainCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "explain",
+		Usage:     "Print the resolved plan",
+		UsageText: "moleman explain [flags]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "pipeline", Value: "default", Usage: "pipeline name"},
+			&cli.StringFlag{Name: "config", Usage: "config file path"},
+			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
+		},
+		Action: func(c *cli.Context) error {
+			cfgPath := resolveConfigPath(c.String("config"), c.String("workdir"))
+			cfg, err := moleman.LoadConfig(cfgPath)
+			if err != nil {
+				return err
+			}
 
-	cfgPath := resolveConfigPath(*configPath, *workdir)
-	if err := moleman.Doctor(cfgPath); err != nil {
-		exitErr(err)
+			plan, err := moleman.ResolvePlan(cfg, c.String("pipeline"))
+			if err != nil {
+				return err
+			}
+
+			return moleman.PrintPlan(plan)
+		},
 	}
-	log.Info("doctor ok")
+}
+
+func initCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "init",
+		Usage:     "Create an example config",
+		UsageText: "moleman init [flags]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
+			&cli.BoolFlag{Name: "force", Usage: "overwrite existing config"},
+			&cli.StringFlag{Name: "config", Usage: "config file path"},
+		},
+		Action: func(c *cli.Context) error {
+			cfgPath := resolveConfigPath(c.String("config"), c.String("workdir"))
+			if err := moleman.Init(cfgPath, c.Bool("force")); err != nil {
+				return err
+			}
+			log.Info("created", "path", cfgPath)
+			return nil
+		},
+	}
+}
+
+func doctorCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "doctor",
+		Usage:     "Validate environment and config",
+		UsageText: "moleman doctor [flags]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
+			&cli.StringFlag{Name: "config", Usage: "config file path"},
+		},
+		Action: func(c *cli.Context) error {
+			cfgPath := resolveConfigPath(c.String("config"), c.String("workdir"))
+			if err := moleman.Doctor(cfgPath); err != nil {
+				return err
+			}
+			log.Info("doctor ok")
+			return nil
+		},
+	}
+}
+
+func versionCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "version",
+		Usage:     "Print version",
+		UsageText: "moleman version",
+		Action: func(c *cli.Context) error {
+			fmt.Println(Version)
+			return nil
+		},
+	}
 }
 
 func resolveConfigPath(configPath, workdir string) string {
@@ -210,11 +247,6 @@ func homeConfigPath() string {
 		return ""
 	}
 	return filepath.Join(home, ".moleman", "configs", "default.yaml")
-}
-
-func exitErr(err error) {
-	log.Error(err.Error())
-	os.Exit(1)
 }
 
 func configureLogging() {

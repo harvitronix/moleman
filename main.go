@@ -50,10 +50,9 @@ func main() {
 func runCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "run",
-		Usage:     "Execute a pipeline",
-		UsageText: "moleman run [flags]\n\nExamples:\n  moleman run --pipeline default --prompt \"Fix the lint errors\"\n  moleman run --config ./moleman.yaml --prompt-file ./prompt.md",
+		Usage:     "Execute the workflow",
+		UsageText: "moleman run [flags]\n\nExamples:\n  moleman run --prompt \"Fix the lint errors\"\n  moleman run --config ./moleman.yaml --prompt-file ./prompt.md",
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "pipeline", Value: "default", Usage: "pipeline name"},
 			&cli.StringFlag{Name: "prompt", Usage: "prompt text"},
 			&cli.StringFlag{Name: "prompt-file", Usage: "prompt file path"},
 			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
@@ -73,7 +72,6 @@ func runCommand() *cli.Command {
 			}
 
 			runOpts := moleman.RunOptions{
-				Pipeline:   c.String("pipeline"),
 				Prompt:     c.String("prompt"),
 				PromptFile: c.String("prompt-file"),
 				Workdir:    c.String("workdir"),
@@ -97,9 +95,10 @@ func runCommand() *cli.Command {
 
 func pipelinesCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "pipelines",
-		Usage:     "List pipelines in the config",
-		UsageText: "moleman pipelines [flags]",
+		Name:      "agents",
+		Aliases:   []string{"pipelines"},
+		Usage:     "List agents in the config",
+		UsageText: "moleman agents [flags]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "config", Usage: "config file path"},
 			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
@@ -111,7 +110,7 @@ func pipelinesCommand() *cli.Command {
 				return err
 			}
 
-			for _, name := range moleman.PipelineNames(cfg) {
+			for _, name := range moleman.AgentNames(cfg) {
 				fmt.Println(name)
 			}
 			return nil
@@ -122,10 +121,9 @@ func pipelinesCommand() *cli.Command {
 func explainCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "explain",
-		Usage:     "Print the resolved plan",
+		Usage:     "Print the resolved workflow",
 		UsageText: "moleman explain [flags]",
 		Flags: []cli.Flag{
-			&cli.StringFlag{Name: "pipeline", Value: "default", Usage: "pipeline name"},
 			&cli.StringFlag{Name: "config", Usage: "config file path"},
 			&cli.StringFlag{Name: "workdir", Usage: "working directory"},
 		},
@@ -136,12 +134,7 @@ func explainCommand() *cli.Command {
 				return err
 			}
 
-			plan, err := moleman.ResolvePlan(cfg, c.String("pipeline"))
-			if err != nil {
-				return err
-			}
-
-			return moleman.PrintPlan(plan)
+			return moleman.PrintWorkflow(cfg.Workflow)
 		},
 	}
 }

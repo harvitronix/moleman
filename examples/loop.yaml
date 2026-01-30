@@ -1,34 +1,61 @@
 version: 1
 
-steps:
-  code:
-    type: run
-    run: "ai-code --non-interactive --prompt {{ shellEscape (printf \"%s\\n\\nDo not offer next steps or additional tasks; just return the requested output.\" .input.prompt) }} --context {{ shellEscape .git.diff }}"
+agents:
+  codex:
+    type: codex
+    args: ["--full-auto"]
+    timeout: 45m
+    capture: [stdout, stderr, exitCode]
+
+  claude:
+    type: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - '{"type":"object","properties":{"must_fix_count":{"type":"integer"},"must_fix_items":{"type":"array","items":{"type":"string"}}},"required":["must_fix_count","must_fix_items"],"additionalProperties":false}'
+      - "--allowedTools"
+      - "Bash(git diff *),Bash(git status *),Read"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
-  lint:
-    type: run
-    run: "pnpm lint"
-    capture: [stdout, stderr, exitCode]
+workflow:
+  - type: agent
+    name: write
+    agent: codex
+    input:
+      from: input
+    output:
+      toNext: true
 
-  review:
-    type: run
-    run: "ai-review --non-interactive --diff {{ shellEscape .git.diff }} --out review.json"
-    parse:
-      kind: json
-      into: review
+  - type: loop
+    maxIters: 3
+    until: "outputs.rereview_json.structured_output.must_fix_count == 0"
+    body:
+      - type: agent
+        name: review
+        agent: claude
+        input:
+          prompt: "Review the current git diff and list must-fix issues."
+        output:
+          toNext: true
 
-pipelines:
-  heavy:
-    plan:
-      - type: loop
-        maxIters: 3
-        until: "steps.lint.exitCode == 0 && vars.review.mustFixCount == 0"
-        body:
-          - type: ref
-            id: code
-          - type: ref
-            id: lint
-          - type: ref
-            id: review
+      - type: agent
+        name: fix
+        agent: codex
+        session:
+          resume: last
+        input:
+          from: review
+        output:
+          toNext: true
+
+      - type: agent
+        name: rereview
+        agent: claude
+        session:
+          resume: last
+        input:
+          prompt: "Re-review the current git diff. Context from last fix: {{ index .outputs \"fix\" }}"
+        output:
+          toNext: true

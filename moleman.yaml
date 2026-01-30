@@ -1,79 +1,63 @@
-# Example config for dogfooding moleman with Codex.
+# Example config for the moleman workflow runner.
+# Copy this file and customize it for your repo.
 version: 1
 
-steps:
-  codex_write:
-    type: run
-    run: "mkdir -p .moleman/tmp && codex exec --full-auto {{ shellEscape (printf \"%s\\n\\nDo not offer next steps or additional tasks; just return the requested output.\" .input.prompt) }} --output-last-message .moleman/tmp/codex_write_last.txt"
+agents:
+  codex:
+    type: codex
+    args: ["--full-auto"]
     timeout: 45m
     capture: [stdout, stderr, exitCode]
 
-  show_codex_write_last:
-    type: run
-    run: "(cat .moleman/tmp/codex_write_last.txt 2>/dev/null || true)"
-    print: [stdout]
-
-  prep_review:
-    type: run
-    run: "mkdir -p .moleman/tmp"
-
-  codex_review:
-    type: run
-    run: "codex exec {{ shellEscape (printf \"Review only the changes not yet committed (the current git diff), and list must-fix issues. Your output will be fed directly to another agent. Do not offer next steps or additional tasks.\\n\\nOriginal prompt that produced this diff (for context):\\n%s\" .input.prompt) }} --output-last-message .moleman/tmp/review.txt"
+  claude:
+    type: claude
+    args:
+      - "--output-format"
+      - "json"
+      - "--json-schema"
+      - '{"type":"object","properties":{"must_fix_count":{"type":"integer"},"must_fix_items":{"type":"array","items":{"type":"string"}},"notes":{"type":"string"}},"required":["must_fix_count","must_fix_items"],"additionalProperties":false}'
+      - "--allowedTools"
+      - "Bash(git diff *),Bash(git status *),Read"
     timeout: 30m
     capture: [stdout, stderr, exitCode]
 
-  show_codex_review_last:
-    type: run
-    run: "(cat .moleman/tmp/review.txt 2>/dev/null || true)"
-    print: [stdout]
-    capture: [stdout, stderr, exitCode]
+workflow:
+  - type: agent
+    name: write
+    agent: codex
+    input:
+      from: input
+    output:
+      toNext: true
 
-  codex_apply_review:
-    type: run
-    run: "{ printf 'Apply the review feedback below. Only change what is required. Do not offer next steps or additional tasks.\\n\\n'; cat .moleman/tmp/review.txt; } | codex exec --full-auto --output-last-message .moleman/tmp/codex_apply_review_last.txt"
-    timeout: 45m
-    capture: [stdout, stderr, exitCode]
+  - type: agent
+    name: review
+    agent: claude
+    input:
+      prompt: "Review only the changes not yet committed (current git diff). Return must-fix issues. Original prompt: {{ .input.prompt }}"
+    output:
+      toNext: true
 
-  show_codex_apply_review_last:
-    type: run
-    run: "(cat .moleman/tmp/codex_apply_review_last.txt 2>/dev/null || true)"
-    print: [stdout]
-    capture: [stdout, stderr, exitCode]
+  - type: loop
+    maxIters: 5
+    until: "outputs.rereview_json.structured_output.must_fix_count == 0"
+    body:
+      - type: agent
+        name: fix
+        agent: codex
+        session:
+          resume: last
+        input:
+          from: review
+        output:
+          toNext: true
 
-  test:
-    type: run
-    run: "make check"
-    timeout: 20m
-
-  build:
-    type: run
-    run: "make build"
-    timeout: 10m
-
-groups:
-  dogfood:
-    - type: ref
-      id: codex_write
-    - type: ref
-      id: show_codex_write_last
-    - type: ref
-      id: prep_review
-    - type: ref
-      id: codex_review
-    - type: ref
-      id: show_codex_review_last
-    - type: ref
-      id: codex_apply_review
-    - type: ref
-      id: show_codex_apply_review_last
-    - type: ref
-      id: test
-    - type: ref
-      id: build
-
-pipelines:
-  default:
-    plan:
-      - type: ref
-        id: dogfood
+      - type: agent
+        name: rereview
+        agent: claude
+        session:
+          resume: last
+        input:
+          prompt: "Re-review the current git diff. Context from last fix: {{ index .outputs \"fix\" }}"
+        output:
+          toNext: true

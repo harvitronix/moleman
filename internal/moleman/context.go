@@ -1,78 +1,31 @@
 package moleman
 
-type InputData struct {
-	Prompt string
-	Issue  string
+type RunContext struct {
+	Input       string
+	Outputs     map[string]any
+	LastOutput  string
+	Sessions    map[string]string
+	RunDir      string
+	Workdir     string
+	Verbose     bool
+	NodeResults []NodeResult
 }
 
-type GitData struct {
-	Diff   string
-	Status string
-	Branch string
-	Root   string
-}
-
-type StepResult struct {
-	Stdout   string
-	Stderr   string
+type NodeResult struct {
+	Name     string
+	Agent    string
 	ExitCode int
 	Duration string
 	Command  string
 }
 
-type StepExecution struct {
-	ID        string
-	Iteration int
-}
-
-type RunContext struct {
-	Input        InputData
-	Git          GitData
-	Steps        map[string]StepResult
-	StepsHistory map[string][]StepResult
-	Vars         map[string]any
-	RunDir       string
-	Workdir      string
-	Verbose      bool
-	StepOrder    []StepExecution
-}
-
 func (ctx *RunContext) TemplateData() map[string]any {
-	steps := map[string]map[string]any{}
-	stepsHistory := map[string][]map[string]any{}
-
-	for id, result := range ctx.Steps {
-		steps[id] = map[string]any{
-			"stdout":   result.Stdout,
-			"stderr":   result.Stderr,
-			"exitCode": result.ExitCode,
-		}
-	}
-	for id, results := range ctx.StepsHistory {
-		history := make([]map[string]any, 0, len(results))
-		for _, result := range results {
-			history = append(history, map[string]any{
-				"stdout":   result.Stdout,
-				"stderr":   result.Stderr,
-				"exitCode": result.ExitCode,
-			})
-		}
-		stepsHistory[id] = history
-	}
-
 	return map[string]any{
 		"input": map[string]any{
-			"prompt": ctx.Input.Prompt,
-			"issue":  ctx.Input.Issue,
+			"prompt": ctx.Input,
 		},
-		"git": map[string]any{
-			"diff":   ctx.Git.Diff,
-			"status": ctx.Git.Status,
-			"branch": ctx.Git.Branch,
-			"root":   ctx.Git.Root,
-		},
-		"steps":        steps,
-		"stepsHistory": stepsHistory,
-		"vars":         ctx.Vars,
+		"outputs":  ctx.Outputs,
+		"last":     ctx.LastOutput,
+		"sessions": ctx.Sessions,
 	}
 }

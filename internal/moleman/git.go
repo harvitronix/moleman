@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+type GitData struct {
+	Diff   string
+	Status string
+	Branch string
+	Root   string
+}
+
 func LoadGitData(workdir string) GitData {
 	return GitData{
 		Diff:   runGitCommand(workdir, "diff"),

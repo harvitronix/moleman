@@ -8,30 +8,22 @@ import (
 
 const defaultConfig = `version: 1
 
-steps:
-  lint:
-    type: run
-    run: "pnpm lint"
-    timeout: 10m
+agents:
+  codex:
+    type: codex
+    args: ["--full-auto"]
+    timeout: 45m
     capture: [stdout, stderr, exitCode]
 
-  tests:
-    type: run
-    run: "pnpm test"
-    timeout: 20m
-
-groups:
-  core:
-    - type: ref
-      id: lint
-    - type: ref
-      id: tests
-
-pipelines:
-  default:
-    plan:
-      - type: ref
-        id: core
+workflow:
+  - type: agent
+    name: write
+    agent: codex
+    input:
+      from: input
+    output:
+      toNext: true
+      stdout: true
 `
 
 func Init(path string, force bool) error {

@@ -2,10 +2,13 @@
 
 ## Unreleased
 
-- Expand README with init/doctor usage, layout guidance, and onboarding tweaks.
-- Clarify in README that moleman invokes pre-installed agent CLIs and does not handle auth.
-- Fix `moleman init` default config to use a single output.
-- `moleman init` now writes a default `agents.yaml` so a new config runs without extra setup.
+## 0.1.1
+
+- Ship shared `agents.yaml` defaults and agent `extends` overrides.
+- Add Codex `outputSchema`/`outputFile` support plus a review schema template.
+- Preflight agent commands and schema paths with clearer failure messages.
+- Treat missing outputs as false in loop condition evaluation.
+- Refresh README and examples for shared agent defaults and Codex schemas.
 
 ## 0.1.0
 

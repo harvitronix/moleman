@@ -1,7 +1,6 @@
 # moleman
 
-moleman is a minimal, shell-first workflow runner for agent-to-agent AI coding
-workflows. It executes a YAML workflow of agent nodes, moves data between
+moleman is a workflow orchestrator for agent-to-agent AI coding. It executes a YAML workflow of agent nodes, moves data between
 agents, and writes artifacts per run for review and auditing.
 
 > Status: early prototype. Expect breaking config and CLI changes.

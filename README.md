@@ -416,9 +416,7 @@ For a Codex + Claude review loop, check `examples/codex-claude-loop.yaml`.
 `moleman --version` prints the current version. The version is tracked in
 `version.go` and is intended to be bumped via release automation.
 
-## Troubleshooting
-
-- No agents listed: make sure `moleman.yaml` exists or pass `--config`.
+## Troubleshooting- No agents listed: make sure `moleman.yaml` exists or pass `--config`.
 - Agent command fails: verify the agent CLI is installed and on `PATH`.
 - Missing outputs: check `.moleman/runs/<timestamp>-workflow/nodes/<name>/`.
 - Weird template output: confirm you used the right data (`.input`, `.last`,

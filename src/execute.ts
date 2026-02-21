@@ -55,7 +55,7 @@ async function executeAgentNode(
 ): Promise<void> {
   const agent = cfg.agents[item.agent];
   if (!agent) {
-    throw new Error(`unknown agent: ${item.agent}`);
+    throw new Error(`unknown agent profile: ${item.agent}`);
   }
 
   const input = await resolveInput(ctx, item.input);
@@ -155,7 +155,7 @@ function buildAgentCommand(
     } else if (agent.type === "claude") {
       command = "claude";
     } else {
-      throw new Error(`unsupported agent type: ${agent.type}`);
+      throw new Error(`unsupported agent runtime: ${agent.type}`);
     }
   }
 
@@ -215,7 +215,7 @@ function buildAgentCommand(
     }
     case "generic": {
       if (!command) {
-        throw new Error("generic agent requires command");
+        throw new Error("generic agent runtime requires command");
       }
       args.push(...(agent.args ?? []));
       if (input) {
@@ -224,7 +224,7 @@ function buildAgentCommand(
       break;
     }
     default:
-      throw new Error(`unsupported agent type: ${(agent as AgentConfig).type}`);
+      throw new Error(`unsupported agent runtime: ${(agent as AgentConfig).type}`);
   }
 
   return { command, args };

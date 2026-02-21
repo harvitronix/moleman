@@ -11,6 +11,34 @@ You define steps in a workflow file (`moleman.yaml`), then run that workflow wit
 
 It does not provide models. It runs CLIs you already have installed.
 
+### Architecture: Runtime vs Profile vs Node
+
+- **Workflow**: an ordered graph of nodes (`agent` and `loop`) executed top-to-bottom from a starter prompt.
+- **Agent Runtime**: built-in support in code (`codex`, `claude`, `generic`).
+- **Agent Profile**: YAML config for a runtime (usually in `agents.yaml`), e.g. model/args/timeout/session defaults.
+- **Agent Node**: a `type: agent` step inside `workflow:` that references an agent profile by name.
+
+So yes, runtime support is code-level, while YAML defines profiles and workflow nodes that use those profiles.
+If you want to support a new runtime (for example `ampcode`), that requires code changes.
+
+Minimal profile + node wiring:
+
+```yaml
+agents:
+  reviewer:
+    type: claude
+    args: ["--output-format", "json"]
+
+workflow:
+  - type: agent
+    name: review
+    agent: reviewer
+    input:
+      from: input
+    output:
+      toNext: true
+```
+
 Typical workflow shapes:
 
 - write -> review -> fix
@@ -46,11 +74,7 @@ moleman --help
 
 First, create or choose a workflow file.
 
-Create starter workflow files:
-
-```bash
-moleman init
-```
+Start from one of the files in `examples/`, then edit it for your repo.
 
 Run the workflow with a starter prompt:
 
@@ -80,7 +104,6 @@ ls .moleman/runs/
 
 ```bash
 moleman run --prompt "..." [--workflow ./moleman.yaml]
-moleman init [--workflow ./moleman.yaml] [--force]
 moleman doctor [--workflow ./moleman.yaml]
 moleman agents [--workflow ./moleman.yaml]
 moleman explain [--workflow ./moleman.yaml]
@@ -173,7 +196,7 @@ workflow:
 
 ## Notes
 
-- Agent types: `codex`, `claude`, `generic`
+- Built-in agent runtimes: `codex`, `claude`, `generic`
 - Template fields: `.input`, `.outputs`, `.last`, `.sessions`
 - `loop.until` is evaluated as JavaScript against workflow data
 

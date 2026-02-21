@@ -4,7 +4,6 @@ import path from "node:path";
 import { Command } from "commander";
 import { agentNames, loadWorkflow, printWorkflow } from "./workflow.js";
 import { doctor } from "./doctor.js";
-import { init } from "./init.js";
 import { error, info, setLogLevel } from "./logger.js";
 import { fileExists, homeWorkflowPath, run } from "./run.js";
 import { VERSION } from "./version.js";
@@ -64,7 +63,7 @@ Examples:
   program
     .command("agents")
     .alias("pipelines")
-    .description("List agents in the workflow")
+    .description("List agent profiles in the workflow")
     .option("--workflow <path>", "workflow file path")
     .option("--workdir <dir>", "working directory")
     .action(async (opts: { workflow?: string; workdir?: string }) => {
@@ -84,18 +83,6 @@ Examples:
       const workflowPath = await resolveWorkflowPath(opts.workflow ?? "", opts.workdir ?? "");
       const workflowConfig = await loadWorkflow(workflowPath);
       printWorkflow(workflowConfig.workflow);
-    });
-
-  program
-    .command("init")
-    .description("Create an example workflow")
-    .option("--workdir <dir>", "working directory")
-    .option("--force", "overwrite existing workflow", false)
-    .option("--workflow <path>", "workflow file path")
-    .action(async (opts: { workdir?: string; force?: boolean; workflow?: string }) => {
-      const workflowPath = await resolveWorkflowPath(opts.workflow ?? "", opts.workdir ?? "");
-      await init(workflowPath, Boolean(opts.force));
-      info("created", { path: workflowPath });
     });
 
   program

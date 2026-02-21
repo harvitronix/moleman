@@ -31,5 +31,5 @@ workflow: []
     "utf8",
   );
 
-  await assert.rejects(() => doctor(workflowPath), /agents map is empty/);
+  await assert.rejects(() => doctor(workflowPath), /agent profiles map is empty/);
 });

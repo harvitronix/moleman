@@ -56,7 +56,7 @@ export function printWorkflow(workflow: WorkflowItem[]): void {
 
 export function validateWorkflowConfig(workflowConfig: WorkflowConfig): void {
   if (Object.keys(workflowConfig.agents).length === 0) {
-    throw new Error("agents map is empty");
+    throw new Error("agent profiles map is empty");
   }
   if (!Array.isArray(workflowConfig.workflow) || workflowConfig.workflow.length === 0) {
     throw new Error("workflow is empty");
@@ -64,22 +64,22 @@ export function validateWorkflowConfig(workflowConfig: WorkflowConfig): void {
 
   for (const [name, agent] of Object.entries(workflowConfig.agents)) {
     if (!agent.type) {
-      throw new Error(`agent ${name} missing type`);
+      throw new Error(`agent profile ${name} missing runtime type`);
     }
     if (!["codex", "claude", "generic"].includes(agent.type)) {
-      throw new Error(`agent ${name} has unsupported type: ${agent.type}`);
+      throw new Error(`agent profile ${name} has unsupported runtime: ${agent.type}`);
     }
     if (agent.type === "generic" && !agent.command) {
-      throw new Error(`agent ${name} type generic requires command`);
+      throw new Error(`agent profile ${name} runtime generic requires command`);
     }
     if (agent.model && agent.type === "generic") {
-      throw new Error(`agent ${name} model is only supported for codex or claude`);
+      throw new Error(`agent profile ${name} model is only supported for codex or claude`);
     }
     if (agent.thinking && agent.type !== "codex") {
-      throw new Error(`agent ${name} thinking is only supported for codex`);
+      throw new Error(`agent profile ${name} thinking is only supported for codex`);
     }
     if (agent.thinking && !isValidCodexThinking(agent.thinking)) {
-      throw new Error(`agent ${name} thinking must be one of minimal, low, medium, high, xhigh`);
+      throw new Error(`agent profile ${name} thinking must be one of minimal, low, medium, high, xhigh`);
     }
   }
 
@@ -142,7 +142,7 @@ function mergeAgents(
     if (agent.extends) {
       const extended = base[agent.extends];
       if (!extended) {
-        throw new Error(`agent ${name} extends unknown agent: ${agent.extends}`);
+        throw new Error(`agent profile ${name} extends unknown agent profile: ${agent.extends}`);
       }
       baseAgent = extended;
     } else if (merged[name]) {
@@ -212,10 +212,10 @@ function validateWorkflowItems(workflowConfig: WorkflowConfig, items: WorkflowIt
     if (type === "agent") {
       const agentName = String(item.agent ?? "");
       if (!agentName) {
-        throw new Error(`workflow[${idx}] agent is required`);
+        throw new Error(`workflow[${idx}] agent profile is required`);
       }
       if (!workflowConfig.agents[agentName]) {
-        throw new Error(`workflow[${idx}] references unknown agent: ${agentName}`);
+        throw new Error(`workflow[${idx}] references unknown agent profile: ${agentName}`);
       }
 
       const name = String(item.name ?? "");

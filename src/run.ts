@@ -78,19 +78,19 @@ export async function ensureAgentCommands(workflowConfig: WorkflowConfig, workdi
 
     const command = resolveAgentCommand(agent);
     if (!command) {
-      throw new Error(`agent ${name} has no command configured`);
+      throw new Error(`agent profile ${name} has no command configured`);
     }
 
     await commandAvailable(command, workdir).catch((err: unknown) => {
       if (err instanceof Error) {
-        throw new Error(`agent ${name} command not found: ${command} (${err.message})`);
+        throw new Error(`agent profile ${name} command not found: ${command} (${err.message})`);
       }
       throw err;
     });
 
     await validateOutputSchema(agent.outputSchema ?? "", workdir).catch((err: unknown) => {
       if (err instanceof Error) {
-        throw new Error(`agent ${name} output schema error: ${err.message}`);
+        throw new Error(`agent profile ${name} output schema error: ${err.message}`);
       }
       throw err;
     });

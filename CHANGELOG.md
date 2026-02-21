@@ -2,10 +2,17 @@
 
 ## Unreleased
 
-- Ensure JSON outputs are accessible via `structured_output` in conditions.
-- Disable Codex resume when output schema/file is used.
-- Stream agent stdout/stderr when `--verbose` is enabled.
-- Fix review schema required fields and show stderr in node failures.
+- Rewrite CLI implementation from Go to TypeScript for Node.js 24+.
+- Switch packaging/distribution to pnpm (`moleman` bin via `pnpm add -g`).
+- Port workflow execution, workflow validation, templating, loop conditions, and artifacts to TS.
+- Replace Go CI/release workflow with Node-based check/build and release-please settings.
+- Tighten README to a short, practical guide with focused examples.
+- Upgrade pnpm to `10.30.1`, refresh lockfile, and bump dependencies to latest available versions.
+- Clarify README intro with workflow/prompt execution model and concrete workflow patterns.
+- Rename CLI and docs terminology from `config` to `workflow` (`--workflow`, `.moleman/workflows/`).
+- Clarify architecture terminology: code-level agent runtimes vs YAML agent profiles vs workflow agent nodes.
+- Remove the `init` command; workflows now start from the `examples/` directory.
+- Add a `Workflow` definition to the README architecture section for clearer terminology.
 
 ## 0.1.1
 

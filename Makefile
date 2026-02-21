@@ -1,32 +1,24 @@
-.PHONY: help fmt test vet lint build check
+.PHONY: help clean build typecheck test check
 
 help:
 	@echo "Targets:"
-	@echo "  fmt   - gofmt -w ."
-	@echo "  test  - go test ./..."
-	@echo "  vet   - go vet ./..."
-	@echo "  lint  - go vet ./... (and staticcheck if installed)"
-	@echo "  build - go build -o moleman"
-	@echo "  check - fmt, test, vet"
+	@echo "  build      - compile TypeScript to dist/"
+	@echo "  typecheck  - run TypeScript checks"
+	@echo "  test       - run Node test suite"
+	@echo "  check      - typecheck + test"
+	@echo "  clean      - remove dist/"
 
-fmt:
-	gofmt -w .
-
-test:
-	go test ./...
-
-vet:
-	go vet ./...
-
-lint:
-	go vet ./...
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		staticcheck ./...; \
-	else \
-		echo "staticcheck not installed; skipping"; \
-	fi
+clean:
+	pnpm clean
 
 build:
-	go build -o moleman
+	pnpm build
 
-check: fmt test vet
+typecheck:
+	pnpm typecheck
+
+test:
+	pnpm test
+
+check:
+	pnpm check

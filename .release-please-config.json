@@ -1,15 +1,9 @@
 {
-  "release-type": "go",
+  "release-type": "node",
   "packages": {
     ".": {
-      "release-type": "go",
-      "changelog-path": "CHANGELOG.md",
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "version.go"
-        }
-      ]
+      "release-type": "node",
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }

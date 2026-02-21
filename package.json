@@ -1,0 +1,39 @@
+{
+  "name": "moleman",
+  "version": "0.1.1",
+  "description": "Agent-assisted workflow runner",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.30.1",
+  "bin": {
+    "moleman": "dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "examples",
+    "schemas",
+    "agents.yaml",
+    "moleman.yaml"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && node --test dist/test/*.test.js",
+    "check": "pnpm typecheck && pnpm test",
+    "prepare": "pnpm build"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "typescript": "^5.9.3"
+  }
+}

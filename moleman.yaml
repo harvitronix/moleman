@@ -1,4 +1,4 @@
-# Example config for the moleman workflow runner.
+# Example workflow file for the moleman runner.
 # Copy this file and customize it for your repo.
 # Agent defaults live in ./agents.yaml.
 version: 1

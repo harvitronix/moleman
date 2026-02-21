@@ -2,15 +2,15 @@ import { constants as fsConstants, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { executeWorkflow } from "./execute.js";
-import { configDir } from "./config.js";
+import { workflowDir } from "./workflow.js";
 import { info } from "./logger.js";
 import { renderTemplate } from "./template.js";
-import type { AgentConfig, Config, RunContext, RunOptions, RunResult, WorkflowItem } from "./types.js";
+import type { AgentConfig, RunContext, RunOptions, RunResult, WorkflowConfig, WorkflowItem } from "./types.js";
 
-export async function run(cfg: Config, cfgPath: string, opts: RunOptions): Promise<RunResult> {
+export async function run(workflowConfig: WorkflowConfig, workflowPath: string, opts: RunOptions): Promise<RunResult> {
   let workdir = opts.workdir;
   if (!workdir) {
-    workdir = configDir(cfgPath);
+    workdir = workflowDir(workflowPath);
     if (!workdir) {
       workdir = ".";
     }
@@ -27,7 +27,7 @@ export async function run(cfg: Config, cfgPath: string, opts: RunOptions): Promi
     throw err;
   });
 
-  await writeArtifactsSkeleton(runDir, input, cfg.workflow);
+  await writeArtifactsSkeleton(runDir, input, workflowConfig.workflow);
 
   const ctx: RunContext = {
     input,
@@ -41,13 +41,13 @@ export async function run(cfg: Config, cfgPath: string, opts: RunOptions): Promi
   };
 
   try {
-    await ensureAgentCommands(cfg, ctx.workdir);
+    await ensureAgentCommands(workflowConfig, ctx.workdir);
   } catch (err) {
     await writeSummary(runDir, "failed", err, ctx);
     throw err;
   }
 
-  info("run started", { nodes: cfg.workflow.length });
+  info("run started", { nodes: workflowConfig.workflow.length });
   info("run artifacts", { path: runDir });
 
   if (opts.dryRun) {
@@ -56,7 +56,7 @@ export async function run(cfg: Config, cfgPath: string, opts: RunOptions): Promi
   }
 
   try {
-    await executeWorkflow(ctx, cfg, cfg.workflow);
+    await executeWorkflow(ctx, workflowConfig, workflowConfig.workflow);
   } catch (err) {
     await writeSummary(runDir, "failed", err, ctx);
     throw err;
@@ -66,12 +66,12 @@ export async function run(cfg: Config, cfgPath: string, opts: RunOptions): Promi
   return { runDir };
 }
 
-export async function ensureAgentCommands(cfg: Config, workdir: string): Promise<void> {
+export async function ensureAgentCommands(workflowConfig: WorkflowConfig, workdir: string): Promise<void> {
   const usedAgents = new Set<string>();
-  collectAgentNames(cfg.workflow, usedAgents);
+  collectAgentNames(workflowConfig.workflow, usedAgents);
 
   for (const name of usedAgents) {
-    const agent = cfg.agents[name];
+    const agent = workflowConfig.agents[name];
     if (!agent) {
       continue;
     }
@@ -248,8 +248,8 @@ function formatTimestamp(date: Date): string {
   return `${year}${month}${day}-${hour}${minute}${second}`;
 }
 
-export function homeConfigPath(): string {
-  return path.join(os.homedir(), ".moleman", "configs", "default.yaml");
+export function homeWorkflowPath(): string {
+  return path.join(os.homedir(), ".moleman", "workflows", "default.yaml");
 }
 
 export async function fileExists(filePath: string): Promise<boolean> {

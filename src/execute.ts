@@ -8,15 +8,15 @@ import { debug, info, warn } from "./logger.js";
 import { renderTemplate } from "./template.js";
 import type {
   AgentConfig,
-  Config,
   NodeResult,
   RunContext,
   SessionSpec,
+  WorkflowConfig,
   WorkflowItem,
 } from "./types.js";
 import { templateData } from "./types.js";
 
-export async function executeWorkflow(ctx: RunContext, cfg: Config, items: WorkflowItem[]): Promise<void> {
+export async function executeWorkflow(ctx: RunContext, cfg: WorkflowConfig, items: WorkflowItem[]): Promise<void> {
   for (const item of items) {
     if (item.type === "agent") {
       await executeAgentNode(ctx, cfg, item);
@@ -30,7 +30,7 @@ export async function executeWorkflow(ctx: RunContext, cfg: Config, items: Workf
   }
 }
 
-async function executeLoop(ctx: RunContext, cfg: Config, item: Extract<WorkflowItem, { type: "loop" }>): Promise<void> {
+async function executeLoop(ctx: RunContext, cfg: WorkflowConfig, item: Extract<WorkflowItem, { type: "loop" }>): Promise<void> {
   for (let i = 0; i < item.maxIters; i += 1) {
     if (ctx.verbose) {
       debug(`loop iteration ${i + 1}/${item.maxIters}`);
@@ -50,7 +50,7 @@ async function executeLoop(ctx: RunContext, cfg: Config, item: Extract<WorkflowI
 
 async function executeAgentNode(
   ctx: RunContext,
-  cfg: Config,
+  cfg: WorkflowConfig,
   item: Extract<WorkflowItem, { type: "agent" }>,
 ): Promise<void> {
   const agent = cfg.agents[item.agent];

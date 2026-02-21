@@ -1,10 +1,21 @@
 # moleman
 
-`moleman` is a local CLI for running multi-step AI workflows from YAML.
+`moleman` is a local CLI for running multi-step AI workflows from YAML workflow files.
 
-I use it for things like write -> review -> fix loops across Codex/Claude without custom shell scripts.
+You define steps in a workflow file (`moleman.yaml`), then run that workflow with a starter prompt:
 
-It does not include any model runtime. It just executes CLIs you already have installed.
+- `--prompt "..."` for inline input
+- `--prompt-file ./prompt.md` for file input
+
+`moleman` executes each node in order, passes outputs between nodes, and writes run artifacts under `.moleman/runs/`.
+
+It does not provide models. It runs CLIs you already have installed.
+
+Typical workflow shapes:
+
+- write -> review -> fix
+- build -> test -> review <-> build (loop until clean)
+- spec -> implement -> test -> summarize
 
 ## Install
 
@@ -12,7 +23,7 @@ Requirements:
 
 - Node.js 24+
 - `pnpm`
-- Agent CLI on `PATH` (`codex`, `claude`, or a custom command)
+- agent CLI on `PATH` (`codex`, `claude`, or a custom command)
 
 Global install:
 
@@ -33,19 +44,27 @@ moleman --help
 
 ## Basic Use
 
-Create starter config files:
+First, create or choose a workflow file.
+
+Create starter workflow files:
 
 ```bash
 moleman init
 ```
 
-Run with a prompt:
+Run the workflow with a starter prompt:
 
 ```bash
 moleman run --prompt "Fix lint errors in src"
 ```
 
-Check setup:
+Or from a prompt file:
+
+```bash
+moleman run --prompt-file ./prompt.md
+```
+
+Validate workflow + environment:
 
 ```bash
 moleman doctor
@@ -60,23 +79,23 @@ ls .moleman/runs/
 ## Commands
 
 ```bash
-moleman run --prompt "..." [--config ./moleman.yaml]
-moleman init [--config ./moleman.yaml] [--force]
-moleman doctor [--config ./moleman.yaml]
-moleman agents [--config ./moleman.yaml]
-moleman explain [--config ./moleman.yaml]
+moleman run --prompt "..." [--workflow ./moleman.yaml]
+moleman init [--workflow ./moleman.yaml] [--force]
+moleman doctor [--workflow ./moleman.yaml]
+moleman agents [--workflow ./moleman.yaml]
+moleman explain [--workflow ./moleman.yaml]
 moleman version
 ```
 
 Common `run` flags: `--prompt-file`, `--workdir`, `--dry-run`, `--verbose`.
 
-If `--config` is omitted, lookup order is:
+If `--workflow` is omitted, lookup order is:
 
 1. `./moleman.yaml`
-2. `./.moleman/configs/default.yaml`
-3. `~/.moleman/configs/default.yaml`
+2. `./.moleman/workflows/default.yaml`
+3. `~/.moleman/workflows/default.yaml`
 
-`agents.yaml` must be in the same directory as the selected config file.
+`agents.yaml` must be in the same directory as the selected workflow file.
 
 ## Example 1: Minimal
 
@@ -111,22 +130,22 @@ Run:
 moleman run --prompt "Refactor src/session.ts to simplify error handling"
 ```
 
-## Example 2: Write/Review Loop
+## Example 2: Build/Test/Review Loop
 
 ```yaml
 version: 1
 
 agents:
-  claude_review:
+  reviewer:
     extends: claude
     args: ["--output-format", "json"]
 
 workflow:
   - type: agent
-    name: write
+    name: build
     agent: codex
     input:
-      from: input
+      prompt: "Run build and fix compile errors until it succeeds."
     output:
       toNext: true
 
@@ -135,26 +154,26 @@ workflow:
     until: "outputs.review_json.structured_output.must_fix_count == 0"
     body:
       - type: agent
-        name: review
-        agent: claude_review
-        input:
-          prompt: "Review current diff and list must-fix issues."
-        output:
-          toNext: true
-      - type: agent
-        name: fix
+        name: test
         agent: codex
         session:
           resume: last
         input:
-          from: review
+          prompt: "Run tests and fix failures."
+        output:
+          toNext: true
+      - type: agent
+        name: review
+        agent: reviewer
+        input:
+          prompt: "Review current diff. Return must-fix count in JSON."
         output:
           toNext: true
 ```
 
 ## Notes
 
-- Supported agent types: `codex`, `claude`, `generic`
+- Agent types: `codex`, `claude`, `generic`
 - Template fields: `.input`, `.outputs`, `.last`, `.sessions`
 - `loop.until` is evaluated as JavaScript against workflow data
 

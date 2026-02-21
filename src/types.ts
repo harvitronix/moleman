@@ -1,4 +1,4 @@
-export interface Config {
+export interface WorkflowConfig {
   version: number;
   agents: Record<string, AgentConfig>;
   workflow: WorkflowItem[];

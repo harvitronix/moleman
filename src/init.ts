@@ -9,7 +9,7 @@ const defaultAgents = `agents:
     capture: [stdout, stderr, exitCode]
 `;
 
-const defaultConfig = `version: 1
+const defaultWorkflow = `version: 1
 
 workflow:
   - type: agent
@@ -21,30 +21,30 @@ workflow:
       stdout: true
 `;
 
-export async function init(configPath: string, force: boolean): Promise<void> {
-  if (!configPath) {
-    throw new Error("config path is empty");
+export async function init(workflowPath: string, force: boolean): Promise<void> {
+  if (!workflowPath) {
+    throw new Error("workflow path is empty");
   }
 
   if (!force) {
     const exists = await fs
-      .stat(configPath)
+      .stat(workflowPath)
       .then(() => true)
       .catch(() => false);
     if (exists) {
-      throw new Error(`config already exists: ${configPath}`);
+      throw new Error(`workflow already exists: ${workflowPath}`);
     }
   }
 
-  const configDir = path.dirname(configPath);
-  await fs.mkdir(configDir, { recursive: true }).catch((err: unknown) => {
+  const workflowDir = path.dirname(workflowPath);
+  await fs.mkdir(workflowDir, { recursive: true }).catch((err: unknown) => {
     if (err instanceof Error) {
-      throw new Error(`create config dir: ${err.message}`);
+      throw new Error(`create workflow dir: ${err.message}`);
     }
     throw err;
   });
 
-  const agentsPath = path.join(configDir, "agents.yaml");
+  const agentsPath = path.join(workflowDir, "agents.yaml");
   const agentsExists = await fs
     .stat(agentsPath)
     .then(() => true)
@@ -59,9 +59,9 @@ export async function init(configPath: string, force: boolean): Promise<void> {
     });
   }
 
-  await fs.writeFile(configPath, defaultConfig, "utf8").catch((err: unknown) => {
+  await fs.writeFile(workflowPath, defaultWorkflow, "utf8").catch((err: unknown) => {
     if (err instanceof Error) {
-      throw new Error(`write config: ${err.message}`);
+      throw new Error(`write workflow: ${err.message}`);
     }
     throw err;
   });
